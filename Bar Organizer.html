@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bar Organizer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button.active {
+            background-color: #0056b3;
+        }
+        .recipe {
+            background: #fff;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .recipe h2 {
+            margin: 0 0 10px;
+        }
+        .recipe ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        .recipe ul li {
+            margin-bottom: 5px;
+        }
+        .symbols {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Rezepte</h1>
+        <input type="text" id="search" placeholder="Cocktailnamen oder Zutaten (kommagetrennt) eingeben..." oninput="searchRecipes()">
+        <div>
+            <button id="btnMocktails" onclick="filterByType('Mocktail')" class="active">Mocktails</button>
+            <button id="btnCocktails" onclick="filterByType('Cocktail')">Cocktails</button>
+            <button id="btnAll" onclick="filterByType('Alles')">Alles</button>
+        </div>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Datenbank der Rezepte
+        const recipeDatabase = [
+            {
+                name: "Pussy Cat",
+                type: "Mocktail",
+                ingredients: [
+                    { item: "Cassissirup", amount: "2 cl" },
+                    { item: "Ananassaft", amount: "6 cl" },
+                    { item: "Orangensaft", amount: "6 cl" },
+                    { item: "Grapefruitsaft", amount: "6 cl" }
+                ],
+                recipe: "Mit Eiswürfeln im Shaker gut schütteln, in ein großes Longdrinkglas auf einige Eiswürfel abgießen und mit Früchten garnieren. Trinkhalm dazugeben.",
+                symbols: "🍹"
+            },
+            {
+                name: "Tropical",
+                type: "Mocktail",
+                ingredients: [
+                    { item: "Mandelsirup", amount: "2 cl" },
+                    { item: "Pfefferminzsirup", amount: "2 cl" },
+                    { item: "Milch", amount: "nach Bedarf" }
+                ],
+                recipe: "Mandelsirup und Pfefferminzsirup in ein Longdrinkglas geben und mit kalter Milch auffüllen.",
+                symbols: "🥛"
+            },
+            {
+                name: "Alice",
+                type: "Mocktail",
+                ingredients: [
+                    { item: "Grenadine", amount: "1-2 cl" },
+                    { item: "Sahne", amount: "2 cl" },
+                    { item: "Orangensaft", amount: "8 cl" },
+                    { item: "Ananassaft", amount: "8 cl" }
+                ],
+                recipe: "Mit Eiswürfeln im Shaker gut schütteln, in ein großes Fancyglas auf einige Eiswürfel abgießen und mit Früchten garnieren. Trinkhalm dazugeben.",
+                symbols: "🍊"
+            },
+            {
+                name: "Mint Cooler",
+                type: "Mocktail",
+                ingredients: [
+                    { item: "Pfefferminzsirup", amount: "2 cl" },
+                    { item: "Zitronensaft", amount: "8 cl" },
+                    { item: "Maracujanektar", amount: "8 cl" }
+                ],
+                recipe: "Alle Zutaten mit Eiswürfeln kräftig schütteln und in ein großes Glas abseihen. Mit einem Minzezweig verzieren.",
+                symbols: "🌱"
+            },
+		{
+    name: "Cherry Love",
+		    type: "Mocktail",
+    	ingredients: [
+        	{ item: "Pfefferminzsirup", amount: "2 cl" },
+        { item: "Kokossirup", amount: "2 cl" },
+        { item: "Kirschnektar", amount: "16 cl" }
+    ],
+    recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit frischen Kirschen und einem Minzezweig garnieren.",
+    symbols: "🍒"
+},
+{
+    name: "Exotic Punch",
+    type: "Mocktail",
+    ingredients: [
+        { item: "Mangosirup", amount: "2 cl" },
+        { item: "Maracujanektar", amount: "4 cl" },
+        { item: "Ananassaft", amount: "4 cl" },
+        { item: "Orangensaft", amount: "4 cl" },
+        { item: "Grapefruitsaft", amount: "4 cl" }
+    ],
+    recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit Fruchtspieß garnieren.",
+    symbols: "🍹"
+},
+{
+    name: "Summer Feeling",
+    type: "Mocktail",
+    ingredients: [
+        { item: "Cranberrysirup", amount: "2 cl" },
+        { item: "Pfirsichnektar", amount: "8 cl" },
+        { item: "Ananassaft", amount: "8 cl" }
+    ],
+    recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein großes Glas auf einige Eiswürfel abgießen. Ein Pfirsichstück auf den Glasrand stecken.",
+    symbols: "🍑"
+},
+{
+    name: "Cocoloco",
+    type: "Mocktail",
+    ingredients: [
+        { item: "Kokossirup", amount: "2 cl" },
+        { item: "Sahne", amount: "4 cl" },
+        { item: "Ananassaft", amount: "6 cl" },
+        { item: "Maracujanektar", amount: "6 cl" }
+    ],
+    recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Stielglas auf einige Eiswürfel abgießen.",
+    symbols: "🥥"
+},
+{
+    name: "Florida Flip",
+    type: "Mocktail",
+    ingredients: [
+        { item: "Mangosirup", amount: "2 cl" },
+        { item: "Eigelb", amount: "1 Stück" },
+        { item: "Grenadine", amount: "einige Tropfen" },
+        { item: "Orangensaft", amount: "10 cl" }
+    ],
+    recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Stielglas abgießen. Eine Erdbeere an den Glasrand stecken.",
+    symbols: "🌴"
+},
+{
+    name: "Red Risk",
+    type: "Mocktail",
+    ingredients: [
+        { item: "Erdbeersirup", amount: "2 cl" },
+        { item: "Karamellsirup", amount: "2 cl" },
+        { item: "Zitronensaft", amount: "3 cl" },
+        { item: "Orangensaft", amount: "11 cl" }
+    ],
+    recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein großes Stielglas auf einige Eiswürfel abgießen. Mit einem Melonenstück und einer Erdbeere garnieren.",
+    symbols: "🍓"
+},
+{
+    name: "Ambra’s Spezial",
+    type: "Mocktail",
+    ingredients: [
+        { item: "Vanillesirup", amount: "3 cl" },
+        { item: "Karamellsirup", amount: "3 cl" },
+        { item: "Sahne", amount: "4 cl" },
+        { item: "Pfirsichnektar", amount: "8 cl" },
+        { item: "Orangensaft", amount: "5 cl" }
+    ],
+    recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein großes Stielglas auf einige Eiswürfel abgießen. Mit einem Ananasstück und einer Cocktailkirsche garnieren.",
+    symbols: "🍑"
+},
+{
+    name: "Pink Banana",
+    type: "Mocktail",
+    ingredients: [
+        { item: "Bananensirup", amount: "2 cl" },
+        { item: "Sahne", amount: "4 cl" },
+        { item: "Grenadine", amount: "2 cl" },
+        { item: "Maracujanektar", amount: "16 cl" }
+    ],
+    recipe: "Im Shaker mit einigen Eiswürfeln gut schütteln und in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit Früchten garnieren.",
+    symbols: "🍌"
+},
+{
+    name: "Yellow Boxer",
+    type: "Mocktail",
+    ingredients: [
+        { item: "Mandarinensirup", amount: "2 cl" },
+        { item: "Zitronensaft", amount: "2 cl" },
+        { item: "Orangensaft", amount: "10 cl" },
+        { item: "kaltes Tonic Water", amount: "10 cl" }
+    ],
+    recipe: "Die Zutaten – ohne Tonic Water – mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit Tonic Water auffüllen. Mit Mandarinenstücken und Cocktailkirschen garnieren.",
+    symbols: "🍊"
+},
+{
+        "name": "Golden Nugget",
+        "type": "Mocktail",
+        "ingredients": [
+            { "item": "Limettensirup", "amount": "2 cl" },
+            { "item": "Zitronensaft", "amount": "2 cl" },
+            { "item": "Maracujanektar", "amount": "12 cl" }
+        ],
+        "recipe": "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Fancyglas auf einige Eiswürfel abgießen. Eine Limettenscheibe mit einer Kumquat an den Glasrand stecken.",
+        "symbols": "🍸"
+    },
+    {
+        "name": "Cinderella",
+        "type": "Mocktail",
+        "ingredients": [
+            { "item": "Kokossirup", "amount": "2 cl" },
+            { "item": "Grenadine", "amount": "1 cl" },
+            { "item": "Sahne", "amount": "4 cl" },
+            { "item": "Ananassaft", "amount": "8 cl" },
+            { "item": "Orangensaft", "amount": "8 cl" }
+        ],
+        "recipe": "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein großes Glas auf einige Eiswürfel abgießen. Einen Spieß mit Bananenscheiben und Cocktailkirschen an den Glasrand legen.",
+        "symbols": "🍸"
+    },
+    {
+        "name": "Tom and Cherry",
+        "type": "Mocktail",
+        "ingredients": [
+            { "item": "Maracujasirup", "amount": "2 cl" },
+            { "item": "Pfirsichnektar", "amount": "4 cl" },
+            { "item": "Ananassaft", "amount": "4 cl" },
+            { "item": "Kirschnektar", "amount": "4 cl" },
+            { "item": "Sahne", "amount": "4 cl" }
+        ],
+        "recipe": "Im Shaker mit Eiswürfeln gut schütteln und in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit Früchten garnieren.",
+        "symbols": "🍹"
+    },
+    {
+        "name": "Tropicana",
+        "type": "Mocktail",
+        "ingredients": [
+            { "item": "Limettensirup", "amount": "2 cl" },
+            { "item": "Kokossirup", "amount": "2 cl" },
+            { "item": "Kirschnektar", "amount": "8 cl" },
+            { "item": "Bananennektar", "amount": "8 cl" }
+        ],
+        "recipe": "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit Bananenscheiben und Cocktailkirschen dekorieren.",
+        "symbols": "🍹"
+    },
+            // Zusätzliche Rezepte hier einfügen (Mocktails und Cocktails)
+        ];
+
+        let currentFilter = "Mocktail";
+
+        function filterByType(type) {
+            currentFilter = type;
+            document.getElementById("btnMocktails").classList.remove("active");
+            document.getElementById("btnCocktails").classList.remove("active");
+            document.getElementById("btnAll").classList.remove("active");
+
+            if (type === "Mocktail") {
+                document.getElementById("btnMocktails").classList.add("active");
+            } else if (type === "Cocktail") {
+                document.getElementById("btnCocktails").classList.add("active");
+            } else {
+                document.getElementById("btnAll").classList.add("active");
+            }
+
+            searchRecipes();
+        }
+
+        function searchRecipes() {
+            const query = document.getElementById('search').value.toLowerCase();
+            const resultsDiv = document.getElementById('results');
+            const queryIngredients = query.split(',').map(q => q.trim()).filter(q => q !== '');
+
+            const filtered = recipeDatabase.filter(recipe => {
+                const matchesType = currentFilter === "Alles" || recipe.type === currentFilter;
+                const nameMatch = recipe.name.toLowerCase().includes(query);
+                const ingredientMatch = queryIngredients.every(q =>
+                    recipe.ingredients.some(ingredient => ingredient.item.toLowerCase().includes(q))
+                );
+                return matchesType && (nameMatch || ingredientMatch);
+            });
+
+            resultsDiv.innerHTML = '';
+
+            if (filtered.length > 0) {
+                filtered.forEach(recipe => {
+                    const recipeDiv = document.createElement('div');
+                    recipeDiv.classList.add('recipe');
+
+                    const title = document.createElement('h2');
+                    title.textContent = recipe.name;
+
+                    const symbols = document.createElement('div');
+                    symbols.classList.add('symbols');
+                    symbols.textContent = recipe.symbols;
+
+                    const ingredientsList = document.createElement('ul');
+                    recipe.ingredients.forEach(ingredient => {
+                        const li = document.createElement('li');
+                        li.textContent = `${ingredient.amount} ${ingredient.item}`;
+                        ingredientsList.appendChild(li);
+                    });
+
+                    const instructions = document.createElement('p');
+                    instructions.textContent = recipe.recipe;
+
+                    recipeDiv.appendChild(title);
+                    recipeDiv.appendChild(symbols);
+                    recipeDiv.appendChild(ingredientsList);
+                    recipeDiv.appendChild(instructions);
+                    resultsDiv.appendChild(recipeDiv);
+                });
+            } else {
+                resultsDiv.innerHTML = '<p>Keine passenden Rezepte gefunden.</p>';
+            }
+        }
+
+        // Initiales Laden der Mocktail-Filter
+        searchRecipes();
+    </script>
+</body>
+</html>
