@@ -45,204 +45,207 @@
     "recipe": "Alle Zutaten mit Eiswürfeln kräftig schütteln und in ein großes Glas abseihen. Mit einem Minzezweig verzieren.",
     "symbols": "🌱"
   },
-{
-    name: "Cherry Love",
-		    type: "Mocktail",
-    	ingredients: [
-        	{ item: "Pfefferminzsirup", amount: "2 cl" },
-        { item: "Kokossirup", amount: "2 cl" },
-        { item: "Kirschnektar", amount: "16 cl" }
+  {
+    "name": "Cherry Love",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Pfefferminzsirup", "amount": "2 cl" },
+      { "item": "Kokossirup", "amount": "2 cl" },
+      { "item": "Kirschnektar", "amount": "16 cl" }
     ],
-    recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit frischen Kirschen und einem Minzezweig garnieren.",
-    symbols: "🍒"
-},
-{
-    name: "Exotic Punch",
-    type: "Mocktail",
-    ingredients: [
-        { item: "Mangosirup", amount: "2 cl" },
-        { item: "Maracujanektar", amount: "4 cl" },
-        { item: "Ananassaft", amount: "4 cl" },
-        { item: "Orangensaft", amount: "4 cl" },
-        { item: "Grapefruitsaft", amount: "4 cl" }
+    "recipe": "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit frischen Kirschen und einem Minzezweig garnieren.",
+    "symbols": "🍒"
+  },
+  {
+    "name": "Exotic Punch",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Mangosirup", "amount": "2 cl" },
+      { "item": "Maracujanektar", "amount": "4 cl" },
+      { "item": "Ananassaft", "amount": "4 cl" },
+      { "item": "Orangensaft", "amount": "4 cl" },
+      { "item": "Grapefruitsaft", "amount": "4 cl" }
     ],
-    recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit Fruchtspieß garnieren.",
-    symbols: "🍹"
-},
-{
-    name: "Summer Feeling",
-    type: "Mocktail",
-    ingredients: [
-        { item: "Cranberrysirup", amount: "2 cl" },
-        { item: "Pfirsichnektar", amount: "8 cl" },
-        { item: "Ananassaft", amount: "8 cl" }
+    "recipe": "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit Fruchtspieß garnieren.",
+    "symbols": "🍹"
+  },
+  {
+    "name": "Summer Feeling",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Cranberrysirup", "amount": "2 cl" },
+      { "item": "Pfirsichnektar", "amount": "8 cl" },
+      { "item": "Ananassaft", "amount": "8 cl" }
     ],
-    recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein großes Glas auf einige Eiswürfel abgießen. Ein Pfirsichstück auf den Glasrand stecken.",
-    symbols: "🍑"
-},
-{
-    name: "Cocoloco",
-    type: "Mocktail",
-    ingredients: [
-        { item: "Kokossirup", amount: "2 cl" },
-        { item: "Sahne", amount: "4 cl" },
-        { item: "Ananassaft", amount: "6 cl" },
-        { item: "Maracujanektar", amount: "6 cl" }
+    "recipe": "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein großes Glas auf einige Eiswürfel abgießen. Ein Pfirsichstück auf den Glasrand stecken.",
+    "symbols": "🍑"
+  },
+  {
+    "name": "Cocoloco",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Kokossirup", "amount": "2 cl" },
+      { "item": "Sahne", "amount": "4 cl" },
+      { "item": "Ananassaft", "amount": "6 cl" },
+      { "item": "Maracujanektar", "amount": "6 cl" }
     ],
-    recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Stielglas auf einige Eiswürfel abgießen.",
-    symbols: "🥥"
-},
-{
-    name: "Florida Flip",
-    type: "Mocktail",
-    ingredients: [
-        { item: "Mangosirup", amount: "2 cl" },
-        { item: "Eigelb", amount: "1 Stück" },
-        { item: "Grenadine", amount: "einige Tropfen" },
-        { item: "Orangensaft", amount: "10 cl" }
+    "recipe": "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Stielglas auf einige Eiswürfel abgießen.",
+    "symbols": "🥥"
+  },
+  {
+    "name": "Florida Flip",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Mangosirup", "amount": "2 cl" },
+      { "item": "Eigelb", "amount": "1 Stück" },
+      { "item": "Grenadine", "amount": "einige Tropfen" },
+      { "item": "Orangensaft", "amount": "10 cl" }
     ],
-    recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Stielglas abgießen. Eine Erdbeere an den Glasrand stecken.",
-    symbols: "🌴"
-},
-{
-    name: "Red Risk",
-    type: "Mocktail",
-    ingredients: [
-        { item: "Erdbeersirup", amount: "2 cl" },
-        { item: "Karamellsirup", amount: "2 cl" },
-        { item: "Zitronensaft", amount: "3 cl" },
-        { item: "Orangensaft", amount: "11 cl" }
+    "recipe": "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Stielglas abgießen. Eine Erdbeere an den Glasrand stecken.",
+    "symbols": "🌴"
+  },
+  {
+    "name": "Red Risk",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Erdbeersirup", "amount": "2 cl" },
+      { "item": "Karamellsirup", "amount": "2 cl" },
+      { "item": "Zitronensaft", "amount": "3 cl" },
+      { "item": "Orangensaft", "amount": "11 cl" }
     ],
-    recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein großes Stielglas auf einige Eiswürfel abgießen. Mit einem Melonenstück und einer Erdbeere garnieren.",
-    symbols: "🍓"
-},
-{
-    name: "Ambra’s Spezial",
-    type: "Mocktail",
-    ingredients: [
-        { item: "Vanillesirup", amount: "3 cl" },
-        { item: "Karamellsirup", amount: "3 cl" },
-        { item: "Sahne", amount: "4 cl" },
-        { item: "Pfirsichnektar", amount: "8 cl" },
-        { item: "Orangensaft", amount: "5 cl" }
+    "recipe": "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein großes Stielglas auf einige Eiswürfel abgießen. Mit einem Melonenstück und einer Erdbeere garnieren.",
+    "symbols": "🍓"
+  },
+  {
+    "name": "Ambra’s Spezial",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Vanillesirup", "amount": "3 cl" },
+      { "item": "Karamellsirup", "amount": "3 cl" },
+      { "item": "Sahne", "amount": "4 cl" },
+      { "item": "Pfirsichnektar", "amount": "8 cl" },
+      { "item": "Orangensaft", "amount": "5 cl" }
     ],
-    recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein großes Stielglas auf einige Eiswürfel abgießen. Mit einem Ananasstück und einer Cocktailkirsche garnieren.",
-    symbols: "🍑"
-},
-{
-    name: "Pink Banana",
-    type: "Mocktail",
-    ingredients: [
-        { item: "Bananensirup", amount: "2 cl" },
-        { item: "Sahne", amount: "4 cl" },
-        { item: "Grenadine", amount: "2 cl" },
-        { item: "Maracujanektar", amount: "16 cl" }
+    "recipe": "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein großes Stielglas auf einige Eiswürfel abgießen. Mit einem Ananasstück und einer Cocktailkirsche garnieren.",
+    "symbols": "🍑"
+  },
+  {
+    "name": "Pink Banana",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Bananensirup", "amount": "2 cl" },
+      { "item": "Sahne", "amount": "4 cl" },
+      { "item": "Grenadine", "amount": "2 cl" },
+      { "item": "Maracujanektar", "amount": "16 cl" }
     ],
-    recipe: "Im Shaker mit einigen Eiswürfeln gut schütteln und in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit Früchten garnieren.",
-    symbols: "🍌"
-},
-{
-    name: "Yellow Boxer",
-    type: "Mocktail",
-    ingredients: [
-        { item: "Mandarinensirup", amount: "2 cl" },
-        { item: "Zitronensaft", amount: "2 cl" },
-        { item: "Orangensaft", amount: "10 cl" },
-        { item: "kaltes Tonic Water", amount: "10 cl" }
+    "recipe": "Im Shaker mit einigen Eiswürfeln gut schütteln und in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit Früchten garnieren.",
+    "symbols": "🍌"
+  },
+  {
+    "name": "Yellow Boxer",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Mandarinensirup", "amount": "2 cl" },
+      { "item": "Zitronensaft", "amount": "2 cl" },
+      { "item": "Orangensaft", "amount": "10 cl" },
+      { "item": "kaltes Tonic Water", "amount": "10 cl" }
     ],
-    recipe: "Die Zutaten – ohne Tonic Water – mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit Tonic Water auffüllen. Mit Mandarinenstücken und Cocktailkirschen garnieren.",
-    symbols: "🍊"
-},            {
-                name: "Tutti Frutti",
-                type: "Mocktail",
-                ingredients: [
-                    { item: "Maracujasirup", amount: "4 cl" },
-                    { item: "Orangensaft", amount: "6 cl" },
-                    { item: "Ananassaft", amount: "6 cl" },
-                    { item: "Sahne", amount: "2 cl" }
-                ],
-                recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Longdrinkglas auf einige Eiswürfel abgießen. Ein Aprikosenstück mit einer Traube an den Glasrand stecken.",
-                symbols: "🍹"
-            },
-            {
-                name: "Mango Lady",
-                type: "Mocktail",
-                ingredients: [
-                    { item: "Mangosirup", amount: "2 cl" },
-                    { item: "Orangensaft", amount: "8 cl" },
-                    { item: "kaltes Bitter Lemon", amount: "10 cl" }
-                ],
-                recipe: "Den Sirup und den Saft in ein Longdrinkglas mit Eiswürfeln geben. Mit einem Barlöffel gut vermischen und mit kaltem Bitter Lemon auffüllen. Mit einem Mangostück dekorieren.",
-                symbols: "🍸"
-            },
-            {
-                name: "Flamingo",
-                type: "Mocktail",
-                ingredients: [
-                    { item: "Kokossirup", amount: "2 cl" },
-                    { item: "Erdbeersirup", amount: "2 cl" },
-                    { item: "Grapefruitsaft", amount: "8 cl" },
-                    { item: "Orangensaft", amount: "8 cl" }
-                ],
-                recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein großes Stielglas auf einige Eiswürfel abgießen. Mit einer Erdbeere dekorieren.",
-                symbols: "🍹"
-            },
-            {
-                name: "Red Fruits",
-                type: "Mocktail",
-                ingredients: [
-                    { item: "Grenadine", amount: "2 cl" },
-                    { item: "roter Traubensaft", amount: "6 cl" },
-                    { item: "Kirschnektar", amount: "6 cl" },
-                    { item: "Preiselbeernektar", amount: "6 cl" }
-                ],
-                recipe: "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in eine Cocktailschale mit Eiswürfeln abgießen.",
-                symbols: "🍸"
-            },
-            {
-                name: "Summer Cooler",
-                type: "Mocktail",
-                ingredients: [
-                    { item: "Limettensirup", amount: "2 cl" },
-                    { item: "Kirschnektar", amount: "8 cl" },
-                    { item: "kaltes Ginger Ale", amount: "nach Geschmack" }
-                ],
-                recipe: "Den Limettensirup und den Kirschnektar in ein Longdrinkglas mit Eiswürfeln geben. Mit einem Barlöffel gut vermischen und mit Ginger Ale auffüllen.",
-                symbols: "🥤"
-            },
-            {
-                name: "Orange Velvet",
-                type: "Mocktail",
-                ingredients: [
-                    { item: "Mandelsirup", amount: "1–2 cl" },
-                    { item: "Maracujanektar", amount: "8 cl" },
-                    { item: "Orangensaft", amount: "8 cl" },
-                    { item: "Sahne", amount: "2 cl" }
-                ],
-                recipe: "Mit Eiswürfeln im Shaker gut schütteln, in ein großes Longdrinkglas auf einige Eiswürfel abgießen und mit Früchten garnieren. Trinkhalme dazugeben.",
-                symbols: "🍹"
-            },
-            {
-                name: "Kokos-Schokolade",
-                type: "Mocktail",
-                ingredients: [
-                    { item: "Kokossirup", amount: "2–4 cl" },
-                    { item: "heiße Schokolade", amount: "1 Tasse" },
-                    { item: "leicht geschlagene Sahne", amount: "nach Geschmack" }
-                ],
-                recipe: "Heiße Schokolade auf eine Tasse Sahne geben und Kokossirup dazurühren. Umrühren und leicht geschlagene Sahne darübergeben. Mit Schokoladenraspeln bestreuen.",
-                symbols: "☕"
-            },
-{
-            name: "Tom und Cherry",
-            type: "Mocktail",
-            ingredients: [
-                { item: "Maracujasirup", amount: "2 cl" },
-                { item: "Pfirsichnektar", amount: "4 cl" },
-                { item: "Ananassaft", amount: "4 cl" },
-                { item: "Kirschnektar", amount: "4 cl" },
-                { item: "Sahne", amount: "4 cl" }
-            ],
-            recipe: "Im Shaker mit Eiswürfeln gut schütteln und in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit Früchten garnieren.",
-            symbols: "🍒"
-        }
+    "recipe": "Die Zutaten – ohne Tonic Water – mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit Tonic Water auffüllen. Mit Mandarinenstücken und Cocktailkirschen garnieren.",
+    "symbols": "🍊"
+  },
+  {
+    "name": "Tutti Frutti",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Maracujasirup", "amount": "4 cl" },
+      { "item": "Orangensaft", "amount": "6 cl" },
+      { "item": "Ananassaft", "amount": "6 cl" },
+      { "item": "Sahne", "amount": "2 cl" }
+    ],
+    "recipe": "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein Longdrinkglas auf einige Eiswürfel abgießen. Ein Aprikosenstück mit einer Traube an den Glasrand stecken.",
+    "symbols": "🍹"
+  },
+  {
+    "name": "Mango Lady",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Mangosirup", "amount": "2 cl" },
+      { "item": "Orangensaft", "amount": "8 cl" },
+      { "item": "kaltes Bitter Lemon", "amount": "10 cl" }
+    ],
+    "recipe": "Den Sirup und den Saft in ein Longdrinkglas mit Eiswürfeln geben. Mit einem Barlöffel gut vermischen und mit kaltem Bitter Lemon auffüllen. Mit einem Mangostück dekorieren.",
+    "symbols": "🍸"
+  },
+  {
+    "name": "Flamingo",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Kokossirup", "amount": "2 cl" },
+      { "item": "Erdbeersirup", "amount": "2 cl" },
+      { "item": "Grapefruitsaft", "amount": "8 cl" },
+      { "item": "Orangensaft", "amount": "8 cl" }
+    ],
+    "recipe": "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in ein großes Stielglas auf einige Eiswürfel abgießen. Mit einer Erdbeere dekorieren.",
+    "symbols": "🍹"
+  },
+  {
+    "name": "Red Fruits",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Grenadine", "amount": "2 cl" },
+      { "item": "roter Traubensaft", "amount": "6 cl" },
+      { "item": "Kirschnektar", "amount": "6 cl" },
+      { "item": "Preiselbeernektar", "amount": "6 cl" }
+    ],
+    "recipe": "Mit Eiswürfeln im Shaker kräftig schütteln und durch das Barsieb in eine Cocktailschale mit Eiswürfeln abgießen.",
+    "symbols": "🍸"
+  },
+  {
+    "name": "Summer Cooler",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Limettensirup", "amount": "2 cl" },
+      { "item": "Kirschnektar", "amount": "8 cl" },
+      { "item": "kaltes Ginger Ale", "amount": "nach Geschmack" }
+    ],
+    "recipe": "Den Limettensirup und den Kirschnektar in ein Longdrinkglas mit Eiswürfeln geben. Mit einem Barlöffel gut vermischen und mit Ginger Ale auffüllen.",
+    "symbols": "🥤"
+  },
+  {
+    "name": "Orange Velvet",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Mandelsirup", "amount": "1–2 cl" },
+      { "item": "Maracujanektar", "amount": "8 cl" },
+      { "item": "Orangensaft", "amount": "8 cl" },
+      { "item": "Sahne", "amount": "2 cl" }
+    ],
+    "recipe": "Mit Eiswürfeln im Shaker gut schütteln, in ein großes Longdrinkglas auf einige Eiswürfel abgießen und mit Früchten garnieren. Trinkhalme dazugeben.",
+    "symbols": "🍹"
+  },
+  {
+    "name": "Kokos-Schokolade",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Kokossirup", "amount": "2–4 cl" },
+      { "item": "heiße Schokolade", "amount": "1 Tasse" },
+      { "item": "leicht geschlagene Sahne", "amount": "nach Geschmack" }
+    ],
+    "recipe": "Heiße Schokolade auf eine Tasse Sahne geben und Kokossirup dazurühren. Umrühren und leicht geschlagene Sahne darübergeben. Mit Schokoladenraspeln bestreuen.",
+    "symbols": "☕"
+  },
+  {
+    "name": "Tom und Cherry",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Maracujasirup", "amount": "2 cl" },
+      { "item": "Pfirsichnektar", "amount": "4 cl" },
+      { "item": "Ananassaft", "amount": "4 cl" },
+      { "item": "Kirschnektar", "amount": "4 cl" },
+      { "item": "Sahne", "amount": "4 cl" }
+    ],
+    "recipe": "Im Shaker mit Eiswürfeln gut schütteln und in ein Longdrinkglas auf einige Eiswürfel abgießen. Mit Früchten garnieren.",
+    "symbols": "🍒"
+  }
+]
+
