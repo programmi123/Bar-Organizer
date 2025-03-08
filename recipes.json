@@ -1,0 +1,48 @@
+[
+  {
+    "name": "Pussy Cat",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Cassissirup", "amount": "2 cl" },
+      { "item": "Ananassaft", "amount": "6 cl" },
+      { "item": "Orangensaft", "amount": "6 cl" },
+      { "item": "Grapefruitsaft", "amount": "6 cl" }
+    ],
+    "recipe": "Mit Eiswürfeln im Shaker gut schütteln, in ein großes Longdrinkglas auf einige Eiswürfel abgießen und mit Früchten garnieren. Trinkhalm dazugeben.",
+    "symbols": "🍹"
+  },
+  {
+    "name": "Tropical",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Mandelsirup", "amount": "2 cl" },
+      { "item": "Pfefferminzsirup", "amount": "2 cl" },
+      { "item": "Milch", "amount": "nach Bedarf" }
+    ],
+    "recipe": "Mandelsirup und Pfefferminzsirup in ein Longdrinkglas geben und mit kalter Milch auffüllen.",
+    "symbols": "🥛"
+  },
+  {
+    "name": "Alice",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Grenadine", "amount": "1-2 cl" },
+      { "item": "Sahne", "amount": "2 cl" },
+      { "item": "Orangensaft", "amount": "8 cl" },
+      { "item": "Ananassaft", "amount": "8 cl" }
+    ],
+    "recipe": "Mit Eiswürfeln im Shaker gut schütteln, in ein großes Fancyglas auf einige Eiswürfel abgießen und mit Früchten garnieren. Trinkhalm dazugeben.",
+    "symbols": "🍊"
+  },
+  {
+    "name": "Mint Cooler",
+    "type": "Mocktail",
+    "ingredients": [
+      { "item": "Pfefferminzsirup", "amount": "2 cl" },
+      { "item": "Zitronensaft", "amount": "8 cl" },
+      { "item": "Maracujanektar", "amount": "8 cl" }
+    ],
+    "recipe": "Alle Zutaten mit Eiswürfeln kräftig schütteln und in ein großes Glas abseihen. Mit einem Minzezweig verzieren.",
+    "symbols": "🌱"
+  }
+]
