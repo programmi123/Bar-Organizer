@@ -26,64 +26,67 @@ function searchRecipes() {
     const resultsDiv = document.getElementById('results');
     const queryIngredients = query.split(',').map(q => q.trim()).filter(q => q !== '');
 
-    let filtered = recipeDatabase.filter(recipe => {
+    let fullMatchRecipes = [];
+    let partialMatchRecipes = [];
+
+    recipeDatabase.forEach(recipe => {
         const matchesType = currentFilter === "Alles" || recipe.type === currentFilter;
         const nameMatch = recipe.name.toLowerCase().startsWith(query);
-        const ingredientMatch = queryIngredients.every(q =>
-            recipe.ingredients.some(ingredient => ingredient.item.toLowerCase().startsWith(q))
-        );
-        return matchesType && (nameMatch || ingredientMatch);
-    });
-
-    filtered.sort((a, b) => {
-        const nameA = a.name.toLowerCase();
-        const nameB = b.name.toLowerCase();
-        if (nameA.startsWith(query) && !nameB.startsWith(query)) return -1;
-        if (!nameA.startsWith(query) && nameB.startsWith(query)) return 1;
-        return nameA.localeCompare(nameB);
-    });
-
-    resultsDiv.innerHTML = '';
-
-    let lastMatchCount = null;
-    filtered.forEach(recipe => {
         const matchingIngredients = recipe.ingredients.filter(ing =>
             queryIngredients.some(q => ing.item.toLowerCase().startsWith(q))
         );
         const missingCount = queryIngredients.length - matchingIngredients.length;
 
-        if (lastMatchCount !== null && missingCount > 1 && lastMatchCount <= 1) {
-            const separator = document.createElement('div');
-            separator.classList.add('separator');
-            separator.textContent = 'Mehr als eine Zutat fehlt';
-            resultsDiv.appendChild(separator);
+        if (matchesType && (nameMatch || matchingIngredients.length > 0)) {
+            if (missingCount === 0) {
+                fullMatchRecipes.push(recipe);
+            } else {
+                partialMatchRecipes.push({ recipe, missingCount });
+            }
         }
-        lastMatchCount = missingCount;
-
-        const recipeDiv = document.createElement('div');
-        recipeDiv.classList.add('recipe');
-
-        const title = document.createElement('h2');
-        title.textContent = recipe.name;
-
-        const symbols = document.createElement('div');
-        symbols.classList.add('symbols');
-        symbols.textContent = recipe.symbols;
-
-        const ingredientsList = document.createElement('ul');
-        recipe.ingredients.forEach(ingredient => {
-            const li = document.createElement('li');
-            li.textContent = `${ingredient.amount} ${ingredient.item}`;
-            ingredientsList.appendChild(li);
-        });
-
-        const instructions = document.createElement('p');
-        instructions.textContent = recipe.recipe;
-
-        recipeDiv.appendChild(title);
-        recipeDiv.appendChild(symbols);
-        recipeDiv.appendChild(ingredientsList);
-        recipeDiv.appendChild(instructions);
-        resultsDiv.appendChild(recipeDiv);
     });
+
+    fullMatchRecipes.sort((a, b) => a.name.localeCompare(b.name));
+    partialMatchRecipes.sort((a, b) => a.missingCount - b.missingCount || a.recipe.name.localeCompare(b.recipe.name));
+
+    resultsDiv.innerHTML = '';
+
+    fullMatchRecipes.forEach(recipe => displayRecipe(recipe, resultsDiv));
+
+    if (partialMatchRecipes.length > 0) {
+        const separator = document.createElement('div');
+        separator.classList.add('separator');
+        separator.textContent = 'Mehr als eine Zutat fehlt';
+        resultsDiv.appendChild(separator);
+
+        partialMatchRecipes.forEach(({ recipe }) => displayRecipe(recipe, resultsDiv));
+    }
+}
+
+function displayRecipe(recipe, resultsDiv) {
+    const recipeDiv = document.createElement('div');
+    recipeDiv.classList.add('recipe');
+
+    const title = document.createElement('h2');
+    title.textContent = recipe.name;
+
+    const symbols = document.createElement('div');
+    symbols.classList.add('symbols');
+    symbols.textContent = recipe.symbols;
+
+    const ingredientsList = document.createElement('ul');
+    recipe.ingredients.forEach(ingredient => {
+        const li = document.createElement('li');
+        li.textContent = `${ingredient.amount} ${ingredient.item}`;
+        ingredientsList.appendChild(li);
+    });
+
+    const instructions = document.createElement('p');
+    instructions.textContent = recipe.recipe;
+
+    recipeDiv.appendChild(title);
+    recipeDiv.appendChild(symbols);
+    recipeDiv.appendChild(ingredientsList);
+    recipeDiv.appendChild(instructions);
+    resultsDiv.appendChild(recipeDiv);
 }
