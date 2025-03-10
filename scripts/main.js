@@ -16,7 +16,10 @@ function updateRecipeCount() {
 
 function filterByType(type) {
     currentFilter = type;
-    document.querySelectorAll("button").forEach(btn => btn.classList.remove("active"));
+    document.getElementById("btnMocktails").classList.remove("active");
+    document.getElementById("btnCocktails").classList.remove("active");
+    document.getElementById("btnAll").classList.remove("active");
+    
     document.getElementById(`btn${type}`).classList.add("active");
     searchRecipes();
 }
@@ -30,9 +33,8 @@ function searchRecipes() {
     let partialMatchRecipes = [];
 
     recipeDatabase.forEach(recipe => {
-        const matchesType = currentFilter === "Alles" || recipe.type === currentFilter;
-        if (!matchesType) return;
-
+        if (currentFilter !== "Alles" && recipe.type !== currentFilter) return;
+        
         const nameMatch = recipe.name.toLowerCase().startsWith(query);
         const matchingIngredients = recipe.ingredients.filter(ing =>
             queryIngredients.some(q => ing.item.toLowerCase().startsWith(q))
