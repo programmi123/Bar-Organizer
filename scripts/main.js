@@ -29,10 +29,10 @@ function searchRecipes() {
     let filtered = recipeDatabase.filter(recipe => {
         const matchesType = currentFilter === "Alles" || recipe.type === currentFilter;
         const nameMatch = recipe.name.toLowerCase().startsWith(query);
-        const ingredientMatch = queryIngredients.filter(q =>
+        const ingredientMatch = queryIngredients.every(q =>
             recipe.ingredients.some(ingredient => ingredient.item.toLowerCase().startsWith(q))
         );
-        return matchesType && (nameMatch || ingredientMatch.length > 0);
+        return matchesType && (nameMatch || ingredientMatch);
     });
 
     filtered.sort((a, b) => {
@@ -47,9 +47,10 @@ function searchRecipes() {
 
     let lastMatchCount = null;
     filtered.forEach(recipe => {
-        const missingCount = queryIngredients.length - recipe.ingredients.filter(ing =>
+        const matchingIngredients = recipe.ingredients.filter(ing =>
             queryIngredients.some(q => ing.item.toLowerCase().startsWith(q))
-        ).length;
+        );
+        const missingCount = queryIngredients.length - matchingIngredients.length;
 
         if (lastMatchCount !== null && missingCount > 1 && lastMatchCount <= 1) {
             const separator = document.createElement('div');
