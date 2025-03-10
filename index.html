@@ -5,39 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bar Organizer</title>
     <link rel="stylesheet" href="styles/styles.css">
-    <style>
-        h1 {
-            font-weight: bold;
-            font-size: 2em;
-            text-align: center;
-            padding: 10px;
-            border-bottom: 5px solid black;
-        }
-        #recipe-count {
-            font-weight: bold;
-            font-size: 1.5em;
-            padding: 10px;
-            border-bottom: 3px solid black;
-            text-align: center;
-        }
-        button {
-            font-weight: bold;
-            font-size: 1.2em;
-        }
-    </style>
 </head>
 <body>
     <div class="container">
-        <div id="recipe-count" class="recipe-count">Rezepte: <span id="count">0</span></div>
         <h1>Mocktail- und Cocktail-Rezepte</h1>
         <input type="text" id="search" placeholder="Cocktailnamen oder Zutaten (kommagetrennt) eingeben..." oninput="searchRecipes()">
         <div>
-            <button id="btnMocktail" onclick="filterByType('Mocktail')">Mocktails</button>
-            <button id="btnCocktail" onclick="filterByType('Cocktail')">Cocktails</button>
-            <button id="btnAlles" onclick="filterByType('Alles')" class="active">Alles</button>
+            <button id="btnMocktails" onclick="filterByType('Mocktail')" class="active">Mocktails</button>
+            <button id="btnCocktails" onclick="filterByType('Cocktail')">Cocktails</button>
+            <button id="btnAll" onclick="filterByType('Alles')">Alles</button>
         </div>
         <div id="results"></div>
     </div>
+
     <script src="scripts/main.js"></script>
 </body>
 </html>
