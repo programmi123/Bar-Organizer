@@ -1,17 +1,10 @@
 let recipeDatabase = [];
 let currentFilter = "Alles";
 
-document.addEventListener("DOMContentLoaded", loadRecipes);
-
 async function loadRecipes() {
     const response = await fetch('recipes.json');
     recipeDatabase = await response.json();
-    updateRecipeCount();
     searchRecipes();
-}
-
-function updateRecipeCount() {
-    document.getElementById("count").textContent = recipeDatabase.length;
 }
 
 function filterByType(type) {
@@ -19,8 +12,15 @@ function filterByType(type) {
     document.getElementById("btnMocktails").classList.remove("active");
     document.getElementById("btnCocktails").classList.remove("active");
     document.getElementById("btnAll").classList.remove("active");
-    
-    document.getElementById(`btn${type}`).classList.add("active");
+
+    if (type === "Mocktail") {
+        document.getElementById("btnMocktails").classList.add("active");
+    } else if (type === "Cocktail") {
+        document.getElementById("btnCocktails").classList.add("active");
+    } else {
+        document.getElementById("btnAll").classList.add("active");
+    }
+
     searchRecipes();
 }
 
@@ -29,68 +29,49 @@ function searchRecipes() {
     const resultsDiv = document.getElementById('results');
     const queryIngredients = query.split(',').map(q => q.trim()).filter(q => q !== '');
 
-    let fullMatchRecipes = [];
-    let partialMatchRecipes = [];
-
-    recipeDatabase.forEach(recipe => {
-        if (currentFilter !== "Alles" && recipe.type !== currentFilter) return;
-        
-        const nameMatch = recipe.name.toLowerCase().startsWith(query);
-        const matchingIngredients = recipe.ingredients.filter(ing =>
-            queryIngredients.some(q => ing.item.toLowerCase().startsWith(q))
+    const filtered = recipeDatabase.filter(recipe => {
+        const matchesType = currentFilter === "Alles" || recipe.type === currentFilter;
+        const nameMatch = recipe.name.toLowerCase().includes(query);
+        const ingredientMatch = queryIngredients.every(q =>
+            recipe.ingredients.some(ingredient => ingredient.item.toLowerCase().includes(q))
         );
-        const missingCount = queryIngredients.length - matchingIngredients.length;
-
-        if (nameMatch || matchingIngredients.length > 0) {
-            if (missingCount === 0) {
-                fullMatchRecipes.push(recipe);
-            } else {
-                partialMatchRecipes.push({ recipe, missingCount });
-            }
-        }
+        return matchesType && (nameMatch || ingredientMatch);
     });
-
-    fullMatchRecipes.sort((a, b) => a.name.localeCompare(b.name));
-    partialMatchRecipes.sort((a, b) => a.missingCount - b.missingCount || a.recipe.name.localeCompare(b.recipe.name));
 
     resultsDiv.innerHTML = '';
 
-    fullMatchRecipes.forEach(recipe => displayRecipe(recipe, resultsDiv));
+    if (filtered.length > 0) {
+        filtered.forEach(recipe => {
+            const recipeDiv = document.createElement('div');
+            recipeDiv.classList.add('recipe');
 
-    if (partialMatchRecipes.length > 0) {
-        const separator = document.createElement('div');
-        separator.classList.add('separator');
-        separator.textContent = 'Mehr als eine Zutat fehlt';
-        resultsDiv.appendChild(separator);
+            const title = document.createElement('h2');
+            title.textContent = recipe.name;
 
-        partialMatchRecipes.forEach(({ recipe }) => displayRecipe(recipe, resultsDiv));
+            const symbols = document.createElement('div');
+            symbols.classList.add('symbols');
+            symbols.textContent = recipe.symbols;
+
+            const ingredientsList = document.createElement('ul');
+            recipe.ingredients.forEach(ingredient => {
+                const li = document.createElement('li');
+                li.textContent = `${ingredient.amount} ${ingredient.item}`;
+                ingredientsList.appendChild(li);
+            });
+
+            const instructions = document.createElement('p');
+            instructions.textContent = recipe.recipe;
+
+            recipeDiv.appendChild(title);
+            recipeDiv.appendChild(symbols);
+            recipeDiv.appendChild(ingredientsList);
+            recipeDiv.appendChild(instructions);
+            resultsDiv.appendChild(recipeDiv);
+        });
+    } else {
+        resultsDiv.innerHTML = '<p>Keine passenden Rezepte gekackt.</p>';
     }
 }
 
-function displayRecipe(recipe, resultsDiv) {
-    const recipeDiv = document.createElement('div');
-    recipeDiv.classList.add('recipe');
-
-    const title = document.createElement('h2');
-    title.textContent = recipe.name;
-
-    const symbols = document.createElement('div');
-    symbols.classList.add('symbols');
-    symbols.textContent = recipe.symbols;
-
-    const ingredientsList = document.createElement('ul');
-    recipe.ingredients.forEach(ingredient => {
-        const li = document.createElement('li');
-        li.textContent = `${ingredient.amount} ${ingredient.item}`;
-        ingredientsList.appendChild(li);
-    });
-
-    const instructions = document.createElement('p');
-    instructions.textContent = recipe.recipe;
-
-    recipeDiv.appendChild(title);
-    recipeDiv.appendChild(symbols);
-    recipeDiv.appendChild(ingredientsList);
-    recipeDiv.appendChild(instructions);
-    resultsDiv.appendChild(recipeDiv);
-}
+// Initiales Laden der Rezepte
+loadRecipes();
