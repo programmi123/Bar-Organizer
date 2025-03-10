@@ -35,7 +35,13 @@ function searchRecipes() {
         return matchesType && (nameMatch || ingredientMatch.length > 0);
     });
 
-    filtered.sort((a, b) => a.name.localeCompare(b.name));
+    filtered.sort((a, b) => {
+        const nameA = a.name.toLowerCase();
+        const nameB = b.name.toLowerCase();
+        if (nameA.startsWith(query) && !nameB.startsWith(query)) return -1;
+        if (!nameA.startsWith(query) && nameB.startsWith(query)) return 1;
+        return nameA.localeCompare(nameB);
+    });
 
     resultsDiv.innerHTML = '';
 
