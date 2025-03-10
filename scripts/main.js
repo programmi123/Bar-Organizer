@@ -31,13 +31,15 @@ function searchRecipes() {
 
     recipeDatabase.forEach(recipe => {
         const matchesType = currentFilter === "Alles" || recipe.type === currentFilter;
+        if (!matchesType) return;
+
         const nameMatch = recipe.name.toLowerCase().startsWith(query);
         const matchingIngredients = recipe.ingredients.filter(ing =>
             queryIngredients.some(q => ing.item.toLowerCase().startsWith(q))
         );
         const missingCount = queryIngredients.length - matchingIngredients.length;
 
-        if (matchesType && (nameMatch || matchingIngredients.length > 0)) {
+        if (nameMatch || matchingIngredients.length > 0) {
             if (missingCount === 0) {
                 fullMatchRecipes.push(recipe);
             } else {
