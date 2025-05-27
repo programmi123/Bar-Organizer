@@ -69,7 +69,7 @@ function searchRecipes() {
             resultsDiv.appendChild(recipeDiv);
         });
     } else {
-        resultsDiv.innerHTML = '<p>Keine passenden Rezepte gekackt.</p>';
+        resultsDiv.innerHTML = '<p>Keine passenden Rezepte gefunden.</p>';
     }
 }
 
