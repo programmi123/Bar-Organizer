@@ -169,11 +169,15 @@
                         <button id="staffAddNewRecipeMainBtn" class="hidden staff-action-main-btn bg-teal-500 hover:bg-teal-600 text-white">
                             <i class="fas fa-file-alt mr-1 sm:mr-2"></i><span class="hidden sm:inline">Rezept Hinzuf.</span><span class="sm:hidden">+Rezept</span>
                         </button>
+                        <button id="editModeCloneDrinkBtn" class="hidden staff-action-main-btn bg-sky-500 hover:bg-sky-600 text-white">
+                            <i class="fas fa-clone mr-1 sm:mr-2"></i><span class="hidden sm:inline">Drink Klonen</span><span class="sm:hidden">Klon</span>
+                        </button>
                     </div>
                 </div>
 
                 <div class="flex justify-between items-center mb-4 sm:mb-6">
-                    <div class="flex items-center gap-3"> <h2 id="categoryTitle" class="text-xl sm:text-2xl md:text-3xl font-semibold text-indigo-700 dark:text-indigo-300">Drinks</h2>
+                    <div class="flex items-center gap-3"> 
+                        <h2 id="categoryTitle" class="text-xl sm:text-2xl md:text-3xl font-semibold text-indigo-700 dark:text-indigo-300">Drinks</h2>
                         <button id="staffPurgeCategoryBtn" class="hidden staff-action-main-btn bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 text-xs sm:text-sm">
                             <i class="fas fa-dumpster-fire mr-1"></i> Ordner Leeren
                         </button>
@@ -398,7 +402,7 @@
 
         // User-provided Firebase configuration
         const firebaseConfig = {
-            apiKey: "AIzaSyAVEM6X3OEUuCDBrpShe02Rnq8p13oEf4s",
+            apiKey: "AIzaSyAVEM6X3OEUuCDBrpShe02Rnq8p13oEf4s", // Replace with your actual API key if needed
             authDomain: "bar-organizer-f3784.firebaseapp.com",
             databaseURL: "https://bar-organizer-f3784-default-rtdb.europe-west1.firebasedatabase.app",
             projectId: "bar-organizer-f3784",
@@ -420,11 +424,11 @@
         let currentFilterType = "Alles";
         let currentSearchQuery = "";
         let selectedCategoryId = null;
-        let defaultCategoryIdGlobal = null; 
+        let defaultCategoryIdGlobal = null;
         let editModeActive = false;
         let staffModeActive = false;
-        let initialLoadComplete = false; 
-        let lastSelectedSourceCategoryIdForExistingDrink = null; // For remembering source folder
+        let initialLoadComplete = false;
+        let lastSelectedSourceCategoryIdForExistingDrink = null;
 
         // --- UI Elements ---
         const categoriesContainer = document.getElementById('categoriesContainer');
@@ -433,7 +437,7 @@
         const searchInputMobile = document.getElementById('searchInputMobile');
 
         const addCategoryButton = document.getElementById('addCategoryButton');
-        const addDrinkButton = document.getElementById('addDrinkButton'); 
+        const addDrinkButton = document.getElementById('addDrinkButton'); // Purple button next to category title
         const loadingIndicator = document.getElementById('loadingIndicator');
         const noDrinksMessage = document.getElementById('noDrinksMessage');
         const noCategoriesMessage = document.getElementById('noCategoriesMessage');
@@ -442,6 +446,7 @@
         const staffAddExistingDrinkMainBtn = document.getElementById('staffAddExistingDrinkMainBtn');
         const staffAddNewRecipeMainBtn = document.getElementById('staffAddNewRecipeMainBtn');
         const staffPurgeCategoryBtn = document.getElementById('staffPurgeCategoryBtn');
+        const editModeCloneDrinkBtn = document.getElementById('editModeCloneDrinkBtn'); // New button for cloning in edit mode
 
         const sidebar = document.getElementById('sidebar');
         const sidebarOpenBtn = document.getElementById('sidebarOpenBtn');
@@ -485,7 +490,6 @@
         const categoryEnableStaffQuickConfirmCheckbox = document.getElementById('categoryEnableStaffQuickConfirm');
         const quickConfirmTargetFolderContainer = document.getElementById('quickConfirmTargetFolderContainer');
         const categoryQuickConfirmTargetFolderSelect = document.getElementById('categoryQuickConfirmTargetFolder');
-
 
         const addExistingDrinkModal = document.getElementById('addExistingDrinkModal');
         const addExistingDrinkTargetCategoryIdInput = document.getElementById('addExistingDrinkTargetCategoryId');
@@ -533,7 +537,6 @@
         }
         window.addEventListener('resize', initializeSidebarState);
 
-
         // --- Theme Switcher Logic ---
         function applyTheme(themeToApply) {
             const htmlEl = document.documentElement;
@@ -566,7 +569,6 @@
         settingsButton.addEventListener('click', () => settingsModal.classList.remove('hidden'));
         closeSettingsModalButton.addEventListener('click', () => settingsModal.classList.add('hidden'));
 
-
         // --- Initial Data Setup ---
         async function initializeDefaultData() {
             const snapshot = await get(child(dbRef, dataPath));
@@ -579,8 +581,8 @@
                 allowAddNewRecipe: true,
                 darfDrinksLoeschen: true,
                 darfOrdnerLeeren: false,
-                darfSchnellbestaetigung: false, // New default
-                schnellbestaetigungZielordnerId: null // New default
+                darfSchnellbestaetigung: false,
+                schnellbestaetigungZielordnerId: null
             };
 
             if (initialSetupNeeded) {
@@ -613,14 +615,13 @@
 
             if (!data.appSettings || typeof data.appSettings.defaultCategoryId === 'undefined') {
                  const firstCatId = data.categories ? Object.keys(data.categories)[0] : null;
-                 updates['appSettings/defaultCategoryId'] = firstCatId || "cat_erstelle_eine"; 
+                 updates['appSettings/defaultCategoryId'] = firstCatId || "cat_erstelle_eine";
             }
 
             if (data.categories) {
                 Object.entries(data.categories).forEach(([catId, category]) => {
                     let currentSettings = category.staffSettings || {};
                     let needsUpdate = false;
-                    
                     for (const key in defaultStaffSettings) {
                         if (typeof currentSettings[key] === 'undefined') {
                             currentSettings[key] = defaultStaffSettings[key];
@@ -631,7 +632,7 @@
                         updates[`categories/${catId}/staffSettings`] = currentSettings;
                     }
                 });
-            } else { 
+            } else {
                  updates['categories/cat_initial'] = {
                     name: "Meine Bar",
                     staffSettings: { ...defaultStaffSettings }
@@ -647,14 +648,13 @@
             }
         }
 
-
         // --- Firebase Data Listeners ---
         function loadData() {
             noCategoriesMessage.classList.add('hidden');
 
             onValue(child(dbRef, dataPath), async (snapshot) => {
                 const data = snapshot.val();
-                loadingIndicator.classList.add('hidden'); 
+                loadingIndicator.classList.add('hidden');
 
                 if (!data || !data.categories || Object.keys(data.categories).length === 0) {
                     allCategories = {};
@@ -665,9 +665,9 @@
                     drinksContainer.innerHTML = '';
                     noDrinksMessage.classList.add('hidden');
                     categoryTitle.textContent = "Keine Ordner";
-                    renderCategories(); 
-                    updateStaffActionButtonsVisibility(); 
-                    initialLoadComplete = true; 
+                    renderCategories();
+                    updateMainActionButtonsVisibility(); // Updated function call
+                    initialLoadComplete = true;
                     return;
                 }
 
@@ -676,13 +676,12 @@
                 allDrinks = data.drinks || {};
                 const newDefaultCategoryIdFromDB = data.appSettings?.defaultCategoryId || null;
 
-                // Ensure all categories have full staffSettings
-                const defaultStaffSettings = {
+                const defaultStaffSettingsFull = {
                     allowAddExisting: true, allowAddNewRecipe: true, darfDrinksLoeschen: true, darfOrdnerLeeren: false,
                     darfSchnellbestaetigung: false, schnellbestaetigungZielordnerId: null
                 };
                 Object.values(allCategories).forEach(cat => {
-                    cat.staffSettings = { ...defaultStaffSettings, ...cat.staffSettings };
+                    cat.staffSettings = { ...defaultStaffSettingsFull, ...cat.staffSettings };
                 });
 
                 if (!initialLoadComplete) {
@@ -692,15 +691,15 @@
                     } else if (Object.keys(allCategories).length > 0) {
                         selectedCategoryId = Object.keys(allCategories)[0];
                         if ((!defaultCategoryIdGlobal || !allCategories[defaultCategoryIdGlobal])) {
-                           defaultCategoryIdGlobal = selectedCategoryId; 
+                           defaultCategoryIdGlobal = selectedCategoryId;
                            console.log("Hinweis: Standardordner war ungültig oder nicht gesetzt. Erster Ordner wurde temporär als Standard gewählt.");
                         }
                     } else {
-                        selectedCategoryId = null; 
+                        selectedCategoryId = null;
                     }
                     initialLoadComplete = true;
                 } else {
-                    defaultCategoryIdGlobal = newDefaultCategoryIdFromDB; 
+                    defaultCategoryIdGlobal = newDefaultCategoryIdFromDB;
                     if (selectedCategoryId && !allCategories[selectedCategoryId]) {
                         if (defaultCategoryIdGlobal && allCategories[defaultCategoryIdGlobal]) {
                             selectedCategoryId = defaultCategoryIdGlobal;
@@ -714,8 +713,7 @@
 
                 renderCategories();
                 populateCategorySelectInForms();
-                filterAndRenderDrinks();
-                updateStaffActionButtonsVisibility();
+                filterAndRenderDrinks(); // This will call updateMainActionButtonsVisibility
 
             }, (error) => {
                 console.error("Firebase data listener error:", error);
@@ -723,7 +721,7 @@
                 loadingIndicator.classList.add('hidden');
                 noCategoriesMessage.classList.remove('hidden');
                 noCategoriesMessage.textContent = "Fehler beim Laden der Daten.";
-                initialLoadComplete = true; 
+                initialLoadComplete = true;
             });
         }
 
@@ -735,7 +733,8 @@
                 placeholder.className = 'text-sm text-gray-500 dark:text-gray-400 px-2';
                 placeholder.textContent = editModeActive ? "Klicke unten auf '+ Ordner', um einen neuen Ordner zu erstellen." : "Keine Ordner vorhanden.";
                 categoriesContainer.appendChild(placeholder);
-                updateAddCategoryButtonVisibility(); 
+                updateAddCategoryButtonVisibility();
+                updateMainActionButtonsVisibility(); // Ensure buttons reflect no categories
                 return;
             }
 
@@ -765,12 +764,11 @@
 
                 categoryDiv.addEventListener('click', (e) => {
                     if (e.target.closest('.edit-category-btn') || e.target.closest('.delete-category-btn') || e.target.closest('.set-home-category-btn')) return;
-                    
-                    if (selectedCategoryId !== id) { 
+
+                    if (selectedCategoryId !== id) {
                         selectedCategoryId = id;
-                        renderCategories(); 
-                        filterAndRenderDrinks(); 
-                        updateStaffActionButtonsVisibility(); 
+                        renderCategories(); // Re-render categories to update active state
+                        filterAndRenderDrinks(); // This will update drinks and main action buttons
                     }
                     if (window.innerWidth < 768) toggleSidebar();
                 });
@@ -787,12 +785,12 @@
                 btn.addEventListener('click', (e) => {e.stopPropagation(); setDefaultCategory(btn.dataset.id);});
             });
             updateAddCategoryButtonVisibility();
+            updateMainActionButtonsVisibility(); // Update buttons after categories render
         }
 
         function updateAddCategoryButtonVisibility() {
             addCategoryButton.classList.toggle('hidden', !editModeActive);
         }
-
 
         function filterAndRenderDrinks() {
             if (!selectedCategoryId || !allCategories[selectedCategoryId]) {
@@ -801,9 +799,9 @@
                 noDrinksMessage.classList.remove('hidden');
                 noDrinksMessage.textContent = "Bitte wähle einen Ordner aus der Seitenleiste.";
                 if (Object.keys(allCategories).length === 0) {
-                    noDrinksMessage.classList.add('hidden'); 
+                    noDrinksMessage.classList.add('hidden');
                 }
-                updateStaffActionButtonsVisibility(); 
+                updateMainActionButtonsVisibility(); // Updated function call
                 return;
             }
 
@@ -846,7 +844,7 @@
                 let actionButtonsHtml = '';
                 const staffSettings = currentCategory?.staffSettings;
 
-                if (editModeActive) { 
+                if (editModeActive) {
                     actionButtonsHtml = `
                         <button data-id="${id}" class="edit-drink-btn text-yellow-600 dark:text-yellow-400 hover:text-yellow-500 dark:hover:text-yellow-300 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-xs"><i class="fas fa-edit mr-1"></i> Bearbeiten</button>
                         <button data-id="${id}" class="delete-drink-btn text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-xs"><i class="fas fa-trash mr-1"></i> Löschen</button>
@@ -861,7 +859,6 @@
                     }
                     if(staffButtons) actionButtonsHtml = staffButtons;
                 }
-
 
                 drinkCard.innerHTML = `
                     <div class="flex justify-between items-start mb-3">
@@ -887,19 +884,16 @@
                 drinksContainer.appendChild(drinkCard);
             });
 
-            document.querySelectorAll('.edit-drink-btn').forEach(btn => { 
+            document.querySelectorAll('.edit-drink-btn').forEach(btn => {
                 btn.addEventListener('click', () => handleEditDrink(btn.dataset.id));
             });
-            document.querySelectorAll('.delete-drink-btn').forEach(btn => { 
+            document.querySelectorAll('.delete-drink-btn').forEach(btn => {
                 btn.addEventListener('click', () => handleDeleteDrink(btn.dataset.id));
             });
             document.querySelectorAll('.quick-confirm-btn').forEach(btn => {
                 btn.addEventListener('click', () => handleQuickConfirmDrink(btn.dataset.id, btn.dataset.drinkName));
             });
-
-            const showMainAddDrinkButton = editModeActive && selectedCategoryId && allCategories[selectedCategoryId] && !staffModeActive;
-            addDrinkButton.classList.toggle('hidden', !showMainAddDrinkButton);
-            updateStaffActionButtonsVisibility();
+            updateMainActionButtonsVisibility(); // Updated function call
         }
 
         // --- Edit Mode ---
@@ -930,7 +924,7 @@
                 accessKeyModal.classList.add('hidden');
                 if (initialLoadComplete && (!defaultCategoryIdGlobal || !allCategories[defaultCategoryIdGlobal]) && Object.keys(allCategories).length > 0) {
                     const firstCatId = Object.keys(allCategories)[0];
-                    await setDefaultCategory(firstCatId); 
+                    await setDefaultCategory(firstCatId);
                 }
             } else {
                 accessKeyError.textContent = 'Ungültiger Schlüssel.';
@@ -970,6 +964,25 @@
         });
         document.getElementById('staffAccessKeyCancel').addEventListener('click', () => staffAccessKeyModal.classList.add('hidden'));
 
+        // --- Function to update visibility of all main action buttons ---
+        function updateMainActionButtonsVisibility() {
+            const catExists = selectedCategoryId && allCategories[selectedCategoryId];
+            const currentCategorySettings = catExists ? allCategories[selectedCategoryId].staffSettings : null;
+
+            // Staff Mode Buttons
+            staffAddExistingDrinkMainBtn.classList.toggle('hidden', !(staffModeActive && catExists && currentCategorySettings?.allowAddExisting));
+            staffAddNewRecipeMainBtn.classList.toggle('hidden', !(staffModeActive && catExists && currentCategorySettings?.allowAddNewRecipe));
+            staffPurgeCategoryBtn.classList.toggle('hidden', !(staffModeActive && catExists && currentCategorySettings?.darfOrdnerLeeren));
+
+            // Edit Mode "Add New Drink" Button (purple one, by category title)
+            const showEditModeAddDrinkButton = editModeActive && catExists && !staffModeActive;
+            addDrinkButton.classList.toggle('hidden', !showEditModeAddDrinkButton);
+
+            // Edit Mode "Clone Existing Drink" Button (new one, in the top bar with filters)
+            const showEditModeCloneDrinkButton = editModeActive && catExists && !staffModeActive;
+            editModeCloneDrinkBtn.classList.toggle('hidden', !showEditModeCloneDrinkButton);
+        }
+
 
         function updateActiveModesUI() {
             if (editModeActive) {
@@ -988,7 +1001,7 @@
                 modalEditModeStatusText.textContent = 'Inaktiv';
                 modalEditModeStatusText.className = 'font-semibold text-red-600 dark:text-red-400';
             }
-            updateAddCategoryButtonVisibility(); 
+            updateAddCategoryButtonVisibility();
 
             if (staffModeActive) {
                 modalStaffModeButton.innerHTML = '<i class="fas fa-user-shield mr-2"></i> Personal Modus Verlassen';
@@ -1016,18 +1029,9 @@
                  headerModeStatus.classList.remove('hidden');
             }
 
-            renderCategories(); 
-            filterAndRenderDrinks(); 
-            updateStaffActionButtonsVisibility(); 
-        }
-
-        function updateStaffActionButtonsVisibility() {
-            const catExists = selectedCategoryId && allCategories[selectedCategoryId];
-            const settings = catExists ? allCategories[selectedCategoryId].staffSettings : null;
-
-            staffAddExistingDrinkMainBtn.classList.toggle('hidden', !(staffModeActive && catExists && settings?.allowAddExisting));
-            staffAddNewRecipeMainBtn.classList.toggle('hidden', !(staffModeActive && catExists && settings?.allowAddNewRecipe));
-            staffPurgeCategoryBtn.classList.toggle('hidden', !(staffModeActive && catExists && settings?.darfOrdnerLeeren));
+            renderCategories(); // This will re-render categories and indirectly call updateMainActionButtonsVisibility via filterAndRenderDrinks
+            filterAndRenderDrinks(); // This will re-render drinks and call updateMainActionButtonsVisibility
+            updateMainActionButtonsVisibility(); // Explicit call to ensure immediate UI update for buttons
         }
 
 
@@ -1040,7 +1044,6 @@
         }
         searchInput.addEventListener('input', handleSearchInput);
         searchInputMobile.addEventListener('input', handleSearchInput);
-
 
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -1061,53 +1064,49 @@
         function openCategoryModal(id = null) {
             categoryForm.reset();
             categoryIdInput.value = id || '';
-            const currentEditingCategoryId = id; // Keep track of the folder being edited
+            const currentEditingCategoryId = id;
             const category = id ? allCategories[id] : null;
 
             categoryStaffSettingsOuterContainer.classList.toggle('hidden', !editModeActive);
-            quickConfirmTargetFolderContainer.classList.add('hidden'); // Hide by default
+            quickConfirmTargetFolderContainer.classList.add('hidden');
             categoryQuickConfirmTargetFolderSelect.innerHTML = '<option value="">-- Zielordner wählen --</option>';
 
-
-            if (category) { 
+            if (category) {
                 categoryModalTitle.textContent = 'Ordner Bearbeiten';
                 document.getElementById('categoryName').value = category.name;
-                const staffSettings = category.staffSettings || {}; 
+                const staffSettings = category.staffSettings || {};
                 categoryEnableStaffAddDrinkCheckbox.checked = staffSettings.allowAddExisting !== undefined ? staffSettings.allowAddExisting : true;
                 categoryEnableStaffAddRezeptCheckbox.checked = staffSettings.allowAddNewRecipe !== undefined ? staffSettings.allowAddNewRecipe : true;
                 categoryEnableStaffDeleteDrinkCheckbox.checked = staffSettings.darfDrinksLoeschen !== undefined ? staffSettings.darfDrinksLoeschen : true;
                 categoryEnableStaffPurgeFolderCheckbox.checked = staffSettings.darfOrdnerLeeren !== undefined ? staffSettings.darfOrdnerLeeren : false;
                 categoryEnableStaffQuickConfirmCheckbox.checked = staffSettings.darfSchnellbestaetigung || false;
-                
-                // Populate and set value for quick confirm target folder
                 populateQuickConfirmTargetFolderSelect(currentEditingCategoryId, staffSettings.schnellbestaetigungZielordnerId);
                 if (categoryEnableStaffQuickConfirmCheckbox.checked) {
                     quickConfirmTargetFolderContainer.classList.remove('hidden');
                 }
-
-            } else { 
+            } else {
                 categoryModalTitle.textContent = 'Neuen Ordner Erstellen';
                 categoryEnableStaffAddDrinkCheckbox.checked = true;
                 categoryEnableStaffAddRezeptCheckbox.checked = true;
-                categoryEnableStaffDeleteDrinkCheckbox.checked = true; 
-                categoryEnableStaffPurgeFolderCheckbox.checked = false; 
+                categoryEnableStaffDeleteDrinkCheckbox.checked = true;
+                categoryEnableStaffPurgeFolderCheckbox.checked = false;
                 categoryEnableStaffQuickConfirmCheckbox.checked = false;
-                populateQuickConfirmTargetFolderSelect(null, null); // Populate for new category
+                populateQuickConfirmTargetFolderSelect(null, null);
             }
             categoryModal.classList.remove('hidden');
         }
-        
+
         categoryEnableStaffQuickConfirmCheckbox.addEventListener('change', (e) => {
             quickConfirmTargetFolderContainer.classList.toggle('hidden', !e.target.checked);
             if (!e.target.checked) {
-                categoryQuickConfirmTargetFolderSelect.value = ""; // Reset if unchecked
+                categoryQuickConfirmTargetFolderSelect.value = "";
             }
         });
 
         function populateQuickConfirmTargetFolderSelect(currentEditingCatId, selectedTargetId) {
             categoryQuickConfirmTargetFolderSelect.innerHTML = '<option value="">-- Zielordner wählen --</option>';
             Object.entries(allCategories).forEach(([id, cat]) => {
-                if (id === currentEditingCatId) return; // Cannot target itself
+                if (id === currentEditingCatId) return;
                 const option = document.createElement('option');
                 option.value = id;
                 option.textContent = cat.name;
@@ -1117,7 +1116,6 @@
                 categoryQuickConfirmTargetFolderSelect.appendChild(option);
             });
         }
-
 
         categoryForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1143,22 +1141,21 @@
                     return;
                 }
             } else {
-                 staffSettings = (id && allCategories[id]) ? allCategories[id].staffSettings : { 
+                 staffSettings = (id && allCategories[id]) ? allCategories[id].staffSettings : {
                     allowAddExisting: true, allowAddNewRecipe: true, darfDrinksLoeschen: true, darfOrdnerLeeren: false,
                     darfSchnellbestaetigung: false, schnellbestaetigungZielordnerId: null
                 };
             }
 
-
             const categoryData = { name, staffSettings };
             try {
-                if (id) { 
+                if (id) {
                     await update(child(dbRef, `${dataPath}/categories/${id}`), categoryData);
-                } else { 
+                } else {
                     const newCategoryRef = push(child(dbRef, `${dataPath}/categories`));
                     await set(newCategoryRef, categoryData);
-                    selectedCategoryId = newCategoryRef.key; 
-                    if (Object.keys(allCategories).length === 1 && !defaultCategoryIdGlobal && editModeActive) { 
+                    selectedCategoryId = newCategoryRef.key;
+                    if (Object.keys(allCategories).length === 1 && !defaultCategoryIdGlobal && editModeActive) {
                         await setDefaultCategory(newCategoryRef.key);
                     }
                 }
@@ -1185,19 +1182,17 @@
                     const updates = {};
                     Object.entries(allDrinks).forEach(([drinkId, drink]) => {
                         if (drink.categoryId === id) {
-                            updates[`${dataPath}/drinks/${drinkId}`] = null; 
+                            updates[`${dataPath}/drinks/${drinkId}`] = null;
                         }
                     });
-                    updates[`${dataPath}/categories/${id}`] = null; 
+                    updates[`${dataPath}/categories/${id}`] = null;
 
-                    // Also check if any other category uses this one as a quick confirm target
                     Object.entries(allCategories).forEach(([otherCatId, otherCatData]) => {
                         if (otherCatData.staffSettings?.schnellbestaetigungZielordnerId === id) {
                             updates[`${dataPath}/categories/${otherCatId}/staffSettings/schnellbestaetigungZielordnerId`] = null;
-                            updates[`${dataPath}/categories/${otherCatId}/staffSettings/darfSchnellbestaetigung`] = false; // Also disable quick confirm if target is gone
+                            updates[`${dataPath}/categories/${otherCatId}/staffSettings/darfSchnellbestaetigung`] = false;
                         }
                     });
-
 
                     await update(dbRef, updates);
 
@@ -1205,8 +1200,8 @@
                         const remainingCategoryIds = Object.keys(allCategories).filter(catId => catId !== id);
                         const newDefaultCatId = remainingCategoryIds.length > 0 ? remainingCategoryIds[0] : null;
                         if (newDefaultCatId) {
-                            await setDefaultCategory(newDefaultCatId); 
-                        } else { 
+                            await setDefaultCategory(newDefaultCatId);
+                        } else {
                             await update(child(dbRef, `${dataPath}/appSettings`), { defaultCategoryId: null });
                         }
                     }
@@ -1222,7 +1217,7 @@
                 console.warn("Versuch, ungültige Kategorie als Standard festzulegen:", catId);
                 return;
             }
-            if (defaultCategoryIdGlobal === catId) return; 
+            if (defaultCategoryIdGlobal === catId) return;
 
             try {
                 await update(child(dbRef, `${dataPath}/appSettings`), { defaultCategoryId: catId });
@@ -1233,20 +1228,19 @@
             }
         }
 
-
-        // --- Drink CRUD (Main Add/Edit for Edit Mode, or Staff Add New Recipe) ---
-        addDrinkButton.addEventListener('click', () => { 
+        // --- Drink CRUD & Cloning Logic ---
+        addDrinkButton.addEventListener('click', () => { // Purple button for new drink in edit mode
             if (selectedCategoryId && allCategories[selectedCategoryId]) {
-                openDrinkModal(null, selectedCategoryId); 
+                openDrinkModal(null, selectedCategoryId);
             } else if (Object.keys(allCategories).length > 0) {
                 const firstCatId = Object.keys(allCategories)[0];
-                openDrinkModal(null, firstCatId); 
+                openDrinkModal(null, firstCatId);
             } else {
                 showCustomAlert("Bitte erstelle zuerst einen Ordner, um einen Drink hinzuzufügen.");
             }
         });
 
-        staffAddNewRecipeMainBtn.addEventListener('click', () => { 
+        staffAddNewRecipeMainBtn.addEventListener('click', () => { // Teal button for new recipe in staff mode
             if (selectedCategoryId && allCategories[selectedCategoryId]) {
                  openDrinkModalForNewRecipe(selectedCategoryId);
             } else {
@@ -1254,7 +1248,8 @@
             }
         });
 
-        staffAddExistingDrinkMainBtn.addEventListener('click', () => { 
+        // Event listener for Staff mode "Add Existing Drink" button
+        staffAddExistingDrinkMainBtn.addEventListener('click', () => {
              if (selectedCategoryId && allCategories[selectedCategoryId]) {
                 openAddExistingDrinkModal(selectedCategoryId);
             } else {
@@ -1262,10 +1257,19 @@
             }
         });
 
+        // Event listener for new Edit mode "Clone Drink" button
+        editModeCloneDrinkBtn.addEventListener('click', () => {
+            if (selectedCategoryId && allCategories[selectedCategoryId]) {
+                openAddExistingDrinkModal(selectedCategoryId);
+            } else {
+                showCustomAlert("Bitte wähle zuerst einen Ordner aus, um einen Drink zu klonen.");
+            }
+        });
+
 
         function populateCategorySelectInForms(selectedDrinkCategoryId = null) {
-            drinkCategorySelect.innerHTML = ''; 
-            sourceCategorySelect.innerHTML = '<option value="">-- Wähle Quell-Ordner --</option>'; 
+            drinkCategorySelect.innerHTML = '';
+            sourceCategorySelect.innerHTML = '<option value="">-- Wähle Quell-Ordner --</option>';
 
             const sortedCategories = Object.entries(allCategories).sort(([,a],[,b]) => a.name.localeCompare(b.name));
 
@@ -1273,7 +1277,7 @@
                 const option = document.createElement('option');
                 option.value = id;
                 option.textContent = category.name;
-                if (selectedDrinkCategoryId === id) { 
+                if (selectedDrinkCategoryId === id) {
                     option.selected = true;
                 }
                 drinkCategorySelect.appendChild(option.cloneNode(true));
@@ -1281,7 +1285,7 @@
                 const sourceOption = document.createElement('option');
                 sourceOption.value = id;
                 sourceOption.textContent = category.name;
-                if(id === lastSelectedSourceCategoryIdForExistingDrink) { // Pre-select last used source
+                if(id === lastSelectedSourceCategoryIdForExistingDrink) {
                     sourceOption.selected = true;
                 }
                 sourceCategorySelect.appendChild(sourceOption);
@@ -1289,13 +1293,12 @@
 
             if (!selectedDrinkCategoryId && drinkCategorySelect.options.length > 0) {
                 if (selectedCategoryId && allCategories[selectedCategoryId]) {
-                    drinkCategorySelect.value = selectedCategoryId; 
+                    drinkCategorySelect.value = selectedCategoryId;
                 } else if (drinkCategorySelect.options.length > 0) {
-                    drinkCategorySelect.value = drinkCategorySelect.options[0].value; 
+                    drinkCategorySelect.value = drinkCategorySelect.options[0].value;
                 }
             }
         }
-
 
         function openDrinkModal(id = null, currentCatIdForNewDrink = null, isStaffNewRecipe = false, staffTargetCategoryId = null) {
             drinkForm.reset();
@@ -1306,32 +1309,32 @@
 
             let drinkCategoryIdForSelect = currentCatIdForNewDrink || selectedCategoryId || (Object.keys(allCategories).length > 0 ? Object.keys(allCategories)[0] : null);
 
-            if (id && allDrinks[id]) { 
+            if (id && allDrinks[id]) {
                 drinkModalTitle.textContent = 'Drink Bearbeiten';
                 const drink = allDrinks[id];
                 document.getElementById('drinkName').value = drink.name;
                 document.getElementById('drinkType').value = drink.type;
                 document.getElementById('drinkSymbols').value = drink.symbols || '';
                 document.getElementById('drinkRecipe').value = drink.recipe;
-                drinkCategoryIdForSelect = drink.categoryId; 
+                drinkCategoryIdForSelect = drink.categoryId;
 
                 if (drink.ingredients && drink.ingredients.length > 0) {
                     drink.ingredients.forEach(ing => addIngredientField(ing.item, ing.amount));
                 } else {
-                    addIngredientField(); 
+                    addIngredientField();
                 }
-                drinkCategorySelect.disabled = false; 
-            } else { 
+                drinkCategorySelect.disabled = false;
+            } else {
                 if (isStaffNewRecipe && staffTargetCategoryId && allCategories[staffTargetCategoryId]) {
                     drinkModalTitle.textContent = `Neues Rezept für "${allCategories[staffTargetCategoryId].name}"`;
-                    drinkCategoryIdForSelect = staffTargetCategoryId; 
-                    drinkCategorySelect.disabled = true; 
-                } else { 
+                    drinkCategoryIdForSelect = staffTargetCategoryId;
+                    drinkCategorySelect.disabled = true;
+                } else {
                     drinkModalTitle.textContent = 'Neuen Drink Erstellen';
                     drinkCategoryIdForSelect = currentCatIdForNewDrink;
-                    drinkCategorySelect.disabled = false; 
+                    drinkCategorySelect.disabled = false;
                 }
-                 addIngredientField(); 
+                 addIngredientField();
             }
 
             populateCategorySelectInForms(drinkCategoryIdForSelect);
@@ -1343,16 +1346,14 @@
                 drinkCategorySelect.value = drinkCategorySelect.options[0].value;
             } else if (Object.keys(allCategories).length === 0) {
                 showCustomAlert("Es muss mindestens ein Ordner existieren, um Drinks hinzuzufügen/bearbeiten.");
-                return; 
+                return;
             }
-
             drinkModal.classList.remove('hidden');
         }
 
         function openDrinkModalForNewRecipe(targetCategoryId) {
             openDrinkModal(null, null, true, targetCategoryId);
         }
-
 
         drinkForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1361,7 +1362,6 @@
             const type = document.getElementById('drinkType').value;
             const lockedStaffCategoryId = drinkModalTargetCategoryIdInput.value;
             const categoryId = lockedStaffCategoryId ? lockedStaffCategoryId : drinkCategorySelect.value;
-
             const symbols = document.getElementById('drinkSymbols').value.trim();
             const recipe = document.getElementById('drinkRecipe').value.trim();
 
@@ -1369,7 +1369,7 @@
                 showCustomAlert("Bitte fülle alle Pflichtfelder aus (Name, Typ, Ordner, Rezept).");
                 return;
             }
-             if (!allCategories[categoryId]) { 
+             if (!allCategories[categoryId]) {
                 showCustomAlert("Ungültiger Ordner ausgewählt.");
                 return;
             }
@@ -1391,9 +1391,9 @@
             const drinkData = { name, type, categoryId, symbols, recipe, ingredients };
 
             try {
-                if (id) { 
+                if (id) {
                     await update(child(dbRef, `${dataPath}/drinks/${id}`), drinkData);
-                } else { 
+                } else {
                     const newDrinkRef = push(child(dbRef, `${dataPath}/drinks`));
                     await set(newDrinkRef, drinkData);
                 }
@@ -1420,11 +1420,11 @@
             newField.querySelector('.remove-ingredient-btn').addEventListener('click', () => newField.remove());
         }
 
-        function handleEditDrink(id) { 
+        function handleEditDrink(id) {
             openDrinkModal(id);
         }
 
-        async function handleDeleteDrink(id) { 
+        async function handleDeleteDrink(id) {
             if (!allDrinks[id]) return;
             showConfirmModal(`Sicher, dass du den Drink "${allDrinks[id].name}" löschen willst?`, async () => {
                 try {
@@ -1442,22 +1442,22 @@
                  return;
             }
             addExistingDrinkTargetCategoryIdInput.value = targetCatId;
-            populateCategorySelectInForms(); // This will also handle pre-selecting lastSelectedSourceCategoryIdForExistingDrink
+            populateCategorySelectInForms();
             sourceDrinkSearchInput.value = '';
-            renderSourceDrinksList(); // Render based on pre-selected source or empty
+            renderSourceDrinksList();
             addExistingDrinkModal.classList.remove('hidden');
         }
 
         sourceCategorySelect.addEventListener('change', (e) => {
-            lastSelectedSourceCategoryIdForExistingDrink = e.target.value; // Save selection
+            lastSelectedSourceCategoryIdForExistingDrink = e.target.value;
             renderSourceDrinksList();
         });
         sourceDrinkSearchInput.addEventListener('input', renderSourceDrinksList);
         document.getElementById('addExistingDrinkCancel').addEventListener('click', () => addExistingDrinkModal.classList.add('hidden'));
 
         function renderSourceDrinksList() {
-            const selectedSourceCatId = sourceCategorySelect.value; // Use current value of the select
-            lastSelectedSourceCategoryIdForExistingDrink = selectedSourceCatId; // Update global var
+            const selectedSourceCatId = sourceCategorySelect.value;
+            lastSelectedSourceCategoryIdForExistingDrink = selectedSourceCatId;
 
             const searchTerm = sourceDrinkSearchInput.value.toLowerCase().trim();
             sourceDrinksListContainer.innerHTML = '';
@@ -1493,7 +1493,7 @@
                     }
 
                     const newDrinkData = { ...drink, categoryId: targetCategoryId };
-                    delete newDrinkData.id; 
+                    delete newDrinkData.id;
 
                     try {
                         const newDrinkRef = push(child(dbRef, `${dataPath}/drinks`));
@@ -1523,7 +1523,7 @@
                     const updates = {};
                     Object.entries(allDrinks).forEach(([drinkId, drink]) => {
                         if (drink.categoryId === selectedCategoryId) {
-                            updates[`${dataPath}/drinks/${drinkId}`] = null; 
+                            updates[`${dataPath}/drinks/${drinkId}`] = null;
                         }
                     });
 
@@ -1556,24 +1556,21 @@
                 return;
             }
 
-
             showConfirmModal(`Drink "${drinkName}" wirklich in den Ordner "${targetFolderName}" schnellbestätigen (kopieren)?`, async () => {
-                const drinkToClone = allDrinks[drinkIdToClone];
-                const newDrinkData = { ...drinkToClone, categoryId: targetFolderId };
-                delete newDrinkData.id; // Ensure Firebase generates a new ID for the clone
+                const drinkToCloneData = allDrinks[drinkIdToClone];
+                const newDrinkData = { ...drinkToCloneData, categoryId: targetFolderId };
+                delete newDrinkData.id;
 
                 try {
                     const newDrinkRef = push(child(dbRef, `${dataPath}/drinks`));
                     await set(newDrinkRef, newDrinkData);
                     showCustomAlert(`Drink "${drinkName}" wurde erfolgreich in "${targetFolderName}" kopiert.`);
-                    // No navigation change needed, user stays in the current folder.
                 } catch (error) {
                     console.error("Fehler bei der Schnellbestätigung:", error);
                     showCustomAlert("Fehler bei der Schnellbestätigung des Drinks.");
                 }
             });
         }
-
 
         // --- Confirm Modal ---
         function showConfirmModal(text, callback) {
@@ -1598,17 +1595,16 @@
             customAlertModal.classList.add('hidden');
         });
 
-
         // --- Initial Load ---
         async function main() {
             const initialTheme = localStorage.getItem('theme') || 'system';
             applyTheme(initialTheme);
             initializeSidebarState();
-            loadingIndicator.classList.remove('hidden'); 
+            loadingIndicator.classList.remove('hidden');
 
-            await initializeDefaultData(); 
-            loadData(); 
-            updateActiveModesUI(); 
+            await initializeDefaultData();
+            loadData(); // This will eventually call updateMainActionButtonsVisibility
+            updateActiveModesUI(); // This will also call updateMainActionButtonsVisibility
 
             const defaultFilterBtn = document.querySelector('.filter-btn[data-type="Alles"]');
             if (defaultFilterBtn) {
@@ -1624,7 +1620,6 @@
             noCategoriesMessage.classList.remove('hidden');
             noCategoriesMessage.textContent = "Initialisierungsfehler. Bitte neu laden.";
         });
-
     </script>
 
 </body>
