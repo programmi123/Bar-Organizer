@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bar Organizer</title>
+  <link rel="stylesheet" href="styles/styles.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Mocktail- und Cocktail-Rezepte</h1>
+    <input
+      type="text"
+      id="search"
+      placeholder="Cocktailnamen oder Zutaten (kommagetrennt) eingeben..."
+      oninput="searchRecipes()"
+    />
+    <div>
+      <button id="btnMocktails" onclick="filterByType('Mocktail')" class="active">
+        Mocktails
+      </button>
+      <button id="btnCocktails" onclick="filterByType('Cocktail')">
+        Cocktails
+      </button>
+      <button id="btnAll" onclick="filterByType('Alles')">Alles</button>
+    </div>
+    <div id="results"></div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script type="module">
+    // 1. Core SDKs for App & Analytics (already there)
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-analytics.js";
+
+    // 2. Add the Realtime Database SDK
+    import { getDatabase } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
+
+    // 3. Your web app's Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyAVEM6X3OEUuCDBrpShe02Rnq8p13oEf4s",
+      authDomain: "bar-organizer-f3784.firebaseapp.com",
+      databaseURL:
+        "https://bar-organizer-f3784-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "bar-organizer-f3784",
+      storageBucket: "bar-organizer-f3784.firebasestorage.app",
+      messagingSenderId: "908059088110",
+      appId: "1:908059088110:web:03b861013c137ef1e2cfff",
+      measurementId: "G-M99V8FNP35",
+    };
+
+    // 4. Initialize Firebase
+    export const app = initializeApp(firebaseConfig);
+    export const analytics = getAnalytics(app);
+
+    // 5. Initialize and export the Database instance
+    export const db = getDatabase(app);
+  </script>
+
+  <!-- Your custom script, now as an ES module -->
+  <script type="module" src="scripts/main2.js"></script>
+</body>
+</html>
