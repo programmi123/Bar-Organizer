@@ -368,18 +368,18 @@
 
         // --- Sidebar Logic ---
         function toggleSidebar() {
-            const isOpen = !sidebar.classList.contains('-translate-x-full');
-            if (isOpen) { // Close it
-                sidebar.classList.add('-translate-x-full');
-                sidebarOverlay.classList.add('hidden');
-                if (window.innerWidth >= 768) { // md breakpoint
+            // const isOpen = !sidebar.classList.contains('-translate-x-full'); // Check BEFORE toggle
+            sidebar.classList.toggle('-translate-x-full'); // Perform toggle
+
+            if (window.innerWidth < 768) { // Mobile behavior
+                sidebarOverlay.classList.toggle('hidden');
+                // mainArea margin is handled by Tailwind's md: prefix for desktop,
+                // and on mobile, it should not have this margin as sidebar overlays.
+            } else { // Desktop behavior (md and up)
+                sidebarOverlay.classList.add('hidden'); // Ensure overlay is always hidden
+                if (sidebar.classList.contains('-translate-x-full')) { // If sidebar is NOW hidden
                     mainArea.classList.remove('md:ml-64');
-                }
-            } else { // Open it
-                sidebar.classList.remove('-translate-x-full');
-                if (window.innerWidth < 768) { // md breakpoint
-                    sidebarOverlay.classList.remove('hidden');
-                } else {
+                } else { // If sidebar is NOW visible
                     mainArea.classList.add('md:ml-64');
                 }
             }
@@ -388,18 +388,25 @@
         sidebarCloseBtn.addEventListener('click', toggleSidebar);
         sidebarOverlay.addEventListener('click', toggleSidebar);
 
-        function initializeSidebarState() {
-            if (window.innerWidth < 768) {
-                sidebar.classList.add('-translate-x-full');
-                mainArea.classList.remove('md:ml-64');
-                sidebarOverlay.classList.add('hidden');
-            } else {
-                sidebar.classList.remove('-translate-x-full');
-                mainArea.classList.add('md:ml-64');
-                sidebarOverlay.classList.add('hidden');
+        function initializeSidebarState() { // This function is called on initial load and on resize
+            const isMobile = window.innerWidth < 768;
+
+            if (isMobile) {
+                mainArea.classList.remove('md:ml-64'); // Ensure main area has no explicit left margin on mobile
+                // Show/hide overlay based on whether sidebar is currently expanded or collapsed
+                sidebarOverlay.classList.toggle('hidden', sidebar.classList.contains('-translate-x-full'));
+            } else { // Desktop
+                sidebarOverlay.classList.add('hidden'); // Overlay is never used on desktop
+                // Adjust mainArea margin based on sidebar's current state
+                if (sidebar.classList.contains('-translate-x-full')) { // If sidebar is collapsed
+                    mainArea.classList.remove('md:ml-64');
+                } else { // If sidebar is expanded (not -translate-x-full)
+                    mainArea.classList.add('md:ml-64');
+                }
             }
         }
         window.addEventListener('resize', initializeSidebarState);
+
 
         // --- Theme Switcher Logic ---
         function applyTheme(themeToApply) {
@@ -989,7 +996,7 @@
             const initialTheme = localStorage.getItem('theme') || 'system';
             applyTheme(initialTheme);
             
-            initializeSidebarState(); // Then sidebar
+            initializeSidebarState(); // Then sidebar state based on current view
             
             await initializeDefaultData();
             loadData();
