@@ -1,43 +1,281 @@
 <!DOCTYPE html>
-<html lang="de">
-<head>
+<html lang="de"> <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bar Organizer Deluxe</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <style>
-        /* Custom scrollbar for webkit browsers */
+        /* Custom scrollbar for webkit browsers (light theme) */
         ::-webkit-scrollbar {
             width: 8px;
+            height: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: #2d3748; /* gray-800 */
+            background: #f3f4f6; /* gray-100 */
         }
         ::-webkit-scrollbar-thumb {
-            background: #4a5568; /* gray-600 */
+            background: #9ca3af; /* gray-400 */
             border-radius: 4px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #718096; /* gray-500 */
+            background: #6b7280; /* gray-500 */
         }
+
+        /* Custom scrollbar for webkit browsers (dark theme) */
+        .dark ::-webkit-scrollbar-track {
+            background: #374151; /* gray-700 */
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #6b7280; /* gray-500 */
+        }
+        .dark ::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af; /* gray-400 */
+        }
+
         .drink-card {
             transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
         }
         .drink-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
-        .modal-backdrop {
-            background-color: rgba(0,0,0,0.75);
+        .modal-backdrop { /* Applied to modal wrapper divs */
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
         }
         .category-active {
-            background-color: #4a5fa5 !important; /* A distinct color for active category */
+            background-color: #4f46e5 !important; /* indigo-600 */
             color: white !important;
         }
+        .dark .category-active {
+             background-color: #6366f1 !important; /* indigo-500 */
+        }
+
+        /* Ensure fixed header/sidebar don't hide content */
+        body {
+            padding-top: 0; /* Header is sticky inside mainArea */
+        }
+        #mainArea {
+            padding-top: 0; /* Header is sticky inside mainArea */
+        }
+
+        /* Styling for theme option buttons */
+        .theme-option-button.active {
+            background-color: #4f46e5; /* indigo-600 */
+            color: white;
+        }
+        .dark .theme-option-button.active {
+            background-color: #6366f1; /* indigo-500 */
+             color: white;
+        }
     </style>
+    <script>
+      // Tailwind dark mode configuration (class-based)
+      // This would typically be in tailwind.config.js, but for CDN we manage the class on <html>
+      // Ensure the 'dark' class on <html> triggers Tailwind's dark variants.
+    </script>
 </head>
-<body class="bg-gray-900 text-gray-100 font-sans leading-normal tracking-normal">
+<body class="font-sans leading-normal tracking-normal bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-colors duration-300">
+
+    <div class="flex h-screen overflow-hidden">
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-gray-800 p-4 space-y-4 shadow-xl transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 ease-in-out print:hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-indigo-600 dark:text-indigo-400">Kategorien</h2>
+                <button id="sidebarCloseBtn" class="md:hidden text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <i class="fas fa-times fa-lg"></i>
+                </button>
+            </div>
+            <div id="categoriesContainer" class="space-y-1.5 max-h-[calc(100vh-180px)] overflow-y-auto pr-1">
+                </div>
+            <button id="addCategoryButton" class="hidden w-full mt-auto bg-green-500 hover:bg-green-600 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75">
+                <i class="fas fa-plus mr-2"></i> Kategorie
+            </button>
+        </aside>
+
+        <div id="sidebarOverlay" class="fixed inset-0 z-30 bg-black opacity-50 hidden md:hidden print:hidden"></div>
+
+        <div id="mainArea" class="flex-1 flex flex-col overflow-auto transition-all duration-300 ease-in-out md:ml-64">
+            <header class="sticky top-0 bg-white dark:bg-gray-800 shadow-lg p-3 sm:p-4 z-20 print:hidden">
+                <div class="container mx-auto flex items-center justify-between">
+                    <div class="flex items-center space-x-2 sm:space-x-4">
+                        <button id="sidebarOpenBtn" class="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 focus:outline-none p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <i class="fas fa-bars fa-lg"></i>
+                        </button>
+                        <h1 class="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500">
+                            Bar Organizer Deluxe
+                        </h1>
+                    </div>
+
+                    <div class="flex items-center space-x-2 sm:space-x-3">
+                         <div class="relative hidden sm:block">
+                            <input type="text" id="searchInput" placeholder="Suche Drinks, Zutaten (A,B)..." class="w-full md:w-56 lg:w-72 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-shadow shadow-sm">
+                            <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 pointer-events-none">
+                                <i class="fas fa-search"></i>
+                            </span>
+                        </div>
+                        <span id="headerEditModeStatus" class="hidden px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">Ansichtsmodus</span>
+                        <button id="settingsButton" class="p-2 rounded-full text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <i class="fas fa-cog fa-lg"></i>
+                        </button>
+                    </div>
+                </div>
+                 <div class="mt-2 sm:hidden px-2"> <div class="relative">
+                        <input type="text" id="searchInputMobile" placeholder="Suche Drinks, Zutaten (A,B)..." class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-shadow shadow-sm">
+                        <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 pointer-events-none">
+                            <i class="fas fa-search"></i>
+                        </span>
+                    </div>
+                </div>
+            </header>
+
+            <main class="flex-1 p-4 sm:p-6 md:p-8">
+                <div class="flex flex-col sm:flex-row justify-between items-center mb-4 sm:mb-6">
+                     <div class="flex space-x-1 bg-gray-200 dark:bg-gray-700 p-1 rounded-lg shadow-sm mb-3 sm:mb-0">
+                        <button data-type="Alles" class="filter-btn flex-1 py-2 px-3 rounded-md text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-indigo-500 dark:hover:bg-indigo-600 hover:text-white dark:hover:text-white transition-colors">Alles</button>
+                        <button data-type="Mocktail" class="filter-btn flex-1 py-2 px-3 rounded-md text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-indigo-500 dark:hover:bg-indigo-600 hover:text-white dark:hover:text-white transition-colors">Mocktails</button>
+                        <button data-type="Cocktail" class="filter-btn flex-1 py-2 px-3 rounded-md text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-indigo-500 dark:hover:bg-indigo-600 hover:text-white dark:hover:text-white transition-colors">Cocktails</button>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center mb-4 sm:mb-6">
+                    <h2 id="categoryTitle" class="text-xl sm:text-2xl md:text-3xl font-semibold text-indigo-700 dark:text-indigo-300">Drinks</h2>
+                     <button id="addDrinkButton" class="hidden bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-opacity-75">
+                        <i class="fas fa-plus mr-2"></i> Drink
+                    </button>
+                </div>
+                <div id="loadingIndicator" class="hidden text-center py-10">
+                    <i class="fas fa-spinner fa-spin fa-3x text-indigo-500 dark:text-indigo-400"></i>
+                    <p class="mt-3 text-lg text-gray-600 dark:text-gray-400">Lade Daten...</p>
+                </div>
+                <div id="noDrinksMessage" class="hidden text-center py-10 text-gray-500 dark:text-gray-400 text-xl">
+                    Keine Drinks gefunden.
+                </div>
+                <div id="drinksContainer" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                    </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50 print:hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl w-full max-w-md space-y-6">
+            <div class="flex justify-between items-center">
+                <h3 class="text-xl font-semibold text-gray-800 dark:text-gray-100">Einstellungen</h3>
+                <button id="closeSettingsModal" class="text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500">
+                    <i class="fas fa-times fa-lg"></i>
+                </button>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Theme</label>
+                <div class="flex space-x-2 rounded-lg bg-gray-100 dark:bg-gray-700 p-1">
+                    <button data-theme-value="light" class="theme-option-button flex-1 py-2 px-3 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Light</button>
+                    <button data-theme-value="dark" class="theme-option-button flex-1 py-2 px-3 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Dark</button>
+                    <button data-theme-value="system" class="theme-option-button flex-1 py-2 px-3 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">System</button>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Bearbeitungsmodus</label>
+                <button id="modalEditModeButton" class="w-full text-white font-semibold py-2.5 px-4 rounded-lg shadow-md hover:shadow-lg transition-colors flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-opacity-75">
+                    </button>
+                 <p class="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">Status: <span id="modalEditModeStatusText" class="font-semibold">Aus</span></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="accessKeyModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-[60] print:hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h3 class="text-xl sm:text-2xl font-bold mb-6 text-indigo-600 dark:text-indigo-400">Zugriffsschlüssel Eingeben</h3>
+            <input type="password" id="accessKeyInput" placeholder="Schlüssel" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-4 py-3 mb-1 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+            <p id="accessKeyError" class="text-red-500 dark:text-red-400 text-sm mt-1 mb-4 h-5"></p>
+            <div class="flex justify-end space-x-3">
+                <button id="accessKeyCancel" class="px-5 py-2.5 rounded-md bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">Abbrechen</button>
+                <button id="accessKeySubmit" class="px-5 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">Bestätigen</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="drinkModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50 overflow-y-auto print:hidden">
+        <form id="drinkForm" class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <h3 id="drinkModalTitle" class="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">Drink Bearbeiten</h3>
+            <input type="hidden" id="drinkId">
+            <div>
+                <label for="drinkName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name*</label>
+                <input type="text" id="drinkName" required class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="drinkType" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Typ*</label>
+                    <select id="drinkType" required class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                        <option value="Mocktail">Mocktail</option>
+                        <option value="Cocktail">Cocktail</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="drinkCategory" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Kategorie*</label>
+                    <select id="drinkCategory" required class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label for="drinkSymbols" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Symbole (Emoji)</label>
+                <input type="text" id="drinkSymbols" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Zutaten*</label>
+                <div id="ingredientsContainer" class="space-y-2">
+                </div>
+                <button type="button" id="addIngredientBtn" class="mt-2 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-semibold focus:outline-none"><i class="fas fa-plus-circle mr-1"></i> Zutat hinzufügen</button>
+            </div>
+            <div>
+                <label for="drinkRecipe" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rezept*</label>
+                <textarea id="drinkRecipe" rows="4" required class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none"></textarea>
+            </div>
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button type="button" id="drinkCancel" class="px-5 py-2.5 rounded-md bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">Abbrechen</button>
+                <button type="submit" class="px-5 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">Speichern</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="categoryModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50 print:hidden">
+        <form id="categoryForm" class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-md space-y-6">
+            <h3 id="categoryModalTitle" class="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">Kategorie Bearbeiten</h3>
+            <input type="hidden" id="categoryId">
+            <div>
+                <label for="categoryName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Kategoriename*</label>
+                <input type="text" id="categoryName" required class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+            </div>
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button type="button" id="categoryCancel" class="px-5 py-2.5 rounded-md bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">Abbrechen</button>
+                <button type="submit" class="px-5 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">Speichern</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="confirmModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-[70] print:hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h3 class="text-lg sm:text-xl font-semibold mb-4 text-yellow-600 dark:text-yellow-400">Bestätigung</h3>
+            <p id="confirmModalText" class="text-gray-700 dark:text-gray-300 mb-6">Möchtest du wirklich fortfahren?</p>
+            <div class="flex justify-end space-x-3">
+                <button id="confirmNo" class="px-5 py-2.5 rounded-md bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">Nein</button>
+                <button id="confirmYes" class="px-5 py-2.5 rounded-md bg-red-600 hover:bg-red-700 text-white transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-400">Ja</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="customAlertModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-[70] print:hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <div class="flex items-center mb-4">
+                <i class="fas fa-exclamation-triangle text-yellow-500 dark:text-yellow-400 text-2xl mr-3"></i>
+                <h3 class="text-lg sm:text-xl font-semibold text-yellow-600 dark:text-yellow-400">Hinweis</h3>
+            </div>
+            <p id="customAlertText" class="text-gray-700 dark:text-gray-300 mb-6">Eine Nachricht.</p>
+            <div class="flex justify-end">
+                <button id="customAlertCloseBtn" class="px-5 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">OK</button>
+            </div>
+        </div>
+    </div>
 
     <script type="module">
         // Firebase SDK imports
@@ -46,11 +284,11 @@
 
         // User-provided Firebase configuration
         const firebaseConfig = {
-            apiKey: "AIzaSyAVEM6X3OEUuCDBrpShe02Rnq8p13oEf4s",
+            apiKey: "AIzaSyAVEM6X3OEUuCDBrpShe02Rnq8p13oEf4s", // Replace with your actual API key if needed
             authDomain: "bar-organizer-f3784.firebaseapp.com",
             databaseURL: "https://bar-organizer-f3784-default-rtdb.europe-west1.firebasedatabase.app",
             projectId: "bar-organizer-f3784",
-            storageBucket: "bar-organizer-f3784.firebasestorage.app",
+            storageBucket: "bar-organizer-f3784.appspot.com", // Corrected typical storage bucket format
             messagingSenderId: "908059088110",
             appId: "1:908059088110:web:03b861013c137ef1e2cfff",
             measurementId: "G-M99V8FNP35"
@@ -64,7 +302,7 @@
         // --- Global State ---
         let allCategories = {};
         let allDrinks = {};
-        let currentFilterType = "Alles"; // Mocktail, Cocktail, Alles
+        let currentFilterType = "Alles";
         let currentSearchQuery = "";
         let selectedCategoryId = null;
         let editModeActive = false;
@@ -75,48 +313,152 @@
         const categoriesContainer = document.getElementById('categoriesContainer');
         const drinksContainer = document.getElementById('drinksContainer');
         const searchInput = document.getElementById('searchInput');
-        const editModeButton = document.getElementById('editModeButton');
-        const editModeStatus = document.getElementById('editModeStatus');
+        const searchInputMobile = document.getElementById('searchInputMobile');
+        
         const addCategoryButton = document.getElementById('addCategoryButton');
         const addDrinkButton = document.getElementById('addDrinkButton');
         const loadingIndicator = document.getElementById('loadingIndicator');
         const noDrinksMessage = document.getElementById('noDrinksMessage');
         const categoryTitle = document.getElementById('categoryTitle');
 
-        // --- Modals ---
+        // Sidebar elements
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOpenBtn = document.getElementById('sidebarOpenBtn');
+        const sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const mainArea = document.getElementById('mainArea');
+
+        // Settings Modal elements
+        const settingsButton = document.getElementById('settingsButton');
+        const settingsModal = document.getElementById('settingsModal');
+        const closeSettingsModalButton = document.getElementById('closeSettingsModal');
+        const themeOptionButtons = document.querySelectorAll('.theme-option-button');
+        const modalEditModeButton = document.getElementById('modalEditModeButton');
+        const modalEditModeStatusText = document.getElementById('modalEditModeStatusText');
+        const headerEditModeStatus = document.getElementById('headerEditModeStatus');
+
+
+        // Access Key Modal
         const accessKeyModal = document.getElementById('accessKeyModal');
         const accessKeyInput = document.getElementById('accessKeyInput');
         const accessKeyError = document.getElementById('accessKeyError');
 
+        // Drink Modal
         const drinkModal = document.getElementById('drinkModal');
         const drinkForm = document.getElementById('drinkForm');
         const drinkModalTitle = document.getElementById('drinkModalTitle');
         const drinkIdInput = document.getElementById('drinkId');
         const drinkCategorySelect = document.getElementById('drinkCategory');
 
+        // Category Modal
         const categoryModal = document.getElementById('categoryModal');
         const categoryForm = document.getElementById('categoryForm');
         const categoryModalTitle = document.getElementById('categoryModalTitle');
         const categoryIdInput = document.getElementById('categoryId');
 
+        // Confirm Modal
         const confirmModal = document.getElementById('confirmModal');
         const confirmModalText = document.getElementById('confirmModalText');
         let confirmCallback = null;
 
+        // Custom Alert Modal
+        const customAlertModal = document.getElementById('customAlertModal');
+        const customAlertText = document.getElementById('customAlertText');
+        const customAlertCloseBtn = document.getElementById('customAlertCloseBtn');
 
-        // --- Initial Data Setup (if database is empty) ---
+        // --- Sidebar Logic ---
+        function toggleSidebar() {
+            const isOpen = !sidebar.classList.contains('-translate-x-full');
+            if (isOpen) { // Close it
+                sidebar.classList.add('-translate-x-full');
+                sidebarOverlay.classList.add('hidden');
+                if (window.innerWidth >= 768) { // md breakpoint
+                    mainArea.classList.remove('md:ml-64');
+                }
+            } else { // Open it
+                sidebar.classList.remove('-translate-x-full');
+                if (window.innerWidth < 768) { // md breakpoint
+                    sidebarOverlay.classList.remove('hidden');
+                } else {
+                    mainArea.classList.add('md:ml-64');
+                }
+            }
+        }
+        sidebarOpenBtn.addEventListener('click', toggleSidebar);
+        sidebarCloseBtn.addEventListener('click', toggleSidebar);
+        sidebarOverlay.addEventListener('click', toggleSidebar);
+
+        function initializeSidebarState() {
+            if (window.innerWidth < 768) {
+                sidebar.classList.add('-translate-x-full');
+                mainArea.classList.remove('md:ml-64');
+                sidebarOverlay.classList.add('hidden');
+            } else {
+                sidebar.classList.remove('-translate-x-full');
+                mainArea.classList.add('md:ml-64');
+                sidebarOverlay.classList.add('hidden');
+            }
+        }
+        window.addEventListener('resize', initializeSidebarState);
+
+        // --- Theme Switcher Logic ---
+        function applyTheme(themeToApply) {
+            const htmlEl = document.documentElement;
+            let finalTheme = themeToApply;
+
+            if (themeToApply === 'system') {
+                finalTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+
+            if (finalTheme === 'dark') {
+                htmlEl.classList.add('dark');
+            } else {
+                htmlEl.classList.remove('dark'); // Light theme is default (no 'dark' class)
+            }
+            localStorage.setItem('theme', themeToApply); // Store the user's *choice* (light, dark, or system)
+            updateThemeButtonsState(themeToApply);
+        }
+
+        function updateThemeButtonsState(activeThemeChoice) {
+            themeOptionButtons.forEach(btn => {
+                if (btn.dataset.themeValue === activeThemeChoice) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+        themeOptionButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                applyTheme(button.dataset.themeValue);
+            });
+        });
+
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            if (localStorage.getItem('theme') === 'system') {
+                applyTheme('system');
+            }
+        });
+        
+        // --- Settings Modal Logic ---
+        settingsButton.addEventListener('click', () => settingsModal.classList.remove('hidden'));
+        closeSettingsModalButton.addEventListener('click', () => settingsModal.classList.add('hidden'));
+
+
+        // --- Initial Data Setup ---
         async function initializeDefaultData() {
             const snapshot = await get(child(dbRef, 'barOrganizerData/Key'));
             if (!snapshot.exists()) {
                 console.log("Datenbank scheint leer zu sein. Initialisiere Standarddaten...");
                 const defaultData = {
-                    Key: "geheim123", // Default access key
+                    Key: "geheim123",
                     categories: {
                         [UNCATEGORIZED_ID]: { name: UNCATEGORIZED_NAME },
                         "cat_mocktails": { name: "Mocktails" },
                         "cat_cocktails": { name: "Cocktails" }
                     },
-                    drinks: { // Add a few sample drinks
+                    drinks: {
                         "drink_pussycat": {
                             name: "Pussy Cat", type: "Mocktail", categoryId: "cat_mocktails",
                             ingredients: [{ item: "Cassissirup", amount: "2 cl" }, { item: "Ananassaft", amount: "6 cl" }, { item: "Orangensaft", amount: "6 cl" }, { item: "Grapefruitsaft", amount: "6 cl" }],
@@ -139,20 +481,16 @@
             }
         }
 
-
         // --- Firebase Data Listeners ---
         function loadData() {
             loadingIndicator.classList.remove('hidden');
             onValue(child(dbRef, 'barOrganizerData/categories'), (snapshot) => {
                 allCategories = snapshot.val() || {};
-                if (!allCategories[UNCATEGORIZED_ID]) { // Ensure uncategorized always exists
+                if (!allCategories[UNCATEGORIZED_ID]) {
                     allCategories[UNCATEGORIZED_ID] = { name: UNCATEGORIZED_NAME };
-                    // Optionally save it back to DB if it's critical to persist
-                    // set(child(dbRef, `barOrganizerData/categories/${UNCATEGORIZED_ID}`), { name: UNCATEGORIZED_NAME });
                 }
                 renderCategories();
-                populateCategorySelect(); // For drink form
-                // If no category is selected, select the first one (or uncategorized)
+                populateCategorySelect();
                 if (!selectedCategoryId || !allCategories[selectedCategoryId]) {
                     selectedCategoryId = Object.keys(allCategories)[0] || UNCATEGORIZED_ID;
                 }
@@ -173,82 +511,90 @@
             if (Object.keys(allCategories).length === 0) {
                  const defaultCat = { name: UNCATEGORIZED_NAME };
                  allCategories[UNCATEGORIZED_ID] = defaultCat;
-                 set(child(dbRef, `barOrganizerData/categories/${UNCATEGORIZED_ID}`), defaultCat); // Persist if it wasn't there
+                 set(child(dbRef, `barOrganizerData/categories/${UNCATEGORIZED_ID}`), defaultCat);
             }
-
 
             Object.entries(allCategories).forEach(([id, category]) => {
                 const isActive = id === selectedCategoryId;
                 const categoryDiv = document.createElement('div');
-                categoryDiv.className = `p-3 mb-2 rounded-lg cursor-pointer hover:bg-indigo-700 transition-colors duration-150 ease-in-out flex justify-between items-center ${isActive ? 'bg-indigo-600 category-active' : 'bg-gray-700'}`;
+                categoryDiv.className = `p-2.5 mb-1.5 rounded-lg cursor-pointer hover:bg-indigo-100 dark:hover:bg-gray-700 transition-colors duration-150 ease-in-out flex justify-between items-center text-sm ${isActive ? 'category-active bg-indigo-600 dark:bg-indigo-500 text-white' : 'bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300'}`;
                 categoryDiv.innerHTML = `
-                    <span class="font-semibold">${category.name}</span>
+                    <span class="font-medium">${category.name}</span>
                     ${editModeActive && id !== UNCATEGORIZED_ID ? `
                         <div class="space-x-2">
-                            <button data-id="${id}" class="edit-category-btn text-yellow-400 hover:text-yellow-300"><i class="fas fa-edit"></i></button>
-                            ${Object.keys(allCategories).length > 1 ? `<button data-id="${id}" class="delete-category-btn text-red-400 hover:text-red-300"><i class="fas fa-trash"></i></button>` : ''}
+                            <button data-id="${id}" class="edit-category-btn text-yellow-500 dark:text-yellow-400 hover:text-yellow-400 dark:hover:text-yellow-300 p-1"><i class="fas fa-edit"></i></button>
+                            ${Object.keys(allCategories).length > 1 ? `<button data-id="${id}" class="delete-category-btn text-red-500 dark:text-red-400 hover:text-red-400 dark:hover:text-red-300 p-1"><i class="fas fa-trash"></i></button>` : ''}
                         </div>
                     ` : ''}
                      ${editModeActive && id === UNCATEGORIZED_ID && Object.keys(allCategories).length <=1 ? `
                         <div class="space-x-2">
-                            <button data-id="${id}" class="edit-category-btn text-yellow-400 hover:text-yellow-300"><i class="fas fa-edit"></i></button>
+                            <button data-id="${id}" class="edit-category-btn text-yellow-500 dark:text-yellow-400 hover:text-yellow-400 dark:hover:text-yellow-300 p-1"><i class="fas fa-edit"></i></button>
                         </div>
                     ` : ''}
                 `;
                 categoryDiv.addEventListener('click', (e) => {
                     if (e.target.closest('.edit-category-btn') || e.target.closest('.delete-category-btn')) return;
                     selectedCategoryId = id;
-                    renderCategories(); // Re-render to update active state
+                    renderCategories(); 
                     filterAndRenderDrinks();
+                    if (window.innerWidth < 768) { // Close sidebar on mobile after selection
+                        toggleSidebar();
+                    }
                 });
                 categoriesContainer.appendChild(categoryDiv);
             });
 
-            // Add event listeners for edit/delete category buttons
             document.querySelectorAll('.edit-category-btn').forEach(btn => {
-                btn.addEventListener('click', () => handleEditCategory(btn.dataset.id));
+                btn.addEventListener('click', (e) => {e.stopPropagation(); handleEditCategory(btn.dataset.id);});
             });
             document.querySelectorAll('.delete-category-btn').forEach(btn => {
-                btn.addEventListener('click', () => handleDeleteCategory(btn.dataset.id));
+                btn.addEventListener('click', (e) => {e.stopPropagation(); handleDeleteCategory(btn.dataset.id);});
             });
         }
 
         function filterAndRenderDrinks() {
             if (!selectedCategoryId && Object.keys(allCategories).length > 0) {
-                selectedCategoryId = Object.keys(allCategories)[0]; // Select first category if none selected
+                selectedCategoryId = Object.keys(allCategories)[0];
             } else if (Object.keys(allCategories).length === 0) {
-                 selectedCategoryId = UNCATEGORIZED_ID; // Fallback if no categories exist
+                 selectedCategoryId = UNCATEGORIZED_ID;
             }
-
 
             const currentCategoryName = allCategories[selectedCategoryId]?.name || "Alle Drinks";
             categoryTitle.textContent = currentCategoryName;
             drinksContainer.innerHTML = '';
             noDrinksMessage.classList.add('hidden');
 
-            const drinksToDisplay = Object.entries(allDrinks).filter(([id, drink]) => {
-                const matchesCategory = drink.categoryId === selectedCategoryId || (selectedCategoryId === 'all' && currentFilterType === 'Alles'); // 'all' could be a virtual category for "show all"
-                const matchesType = currentFilterType === "Alles" || drink.type === currentFilterType;
-                const nameMatch = drink.name.toLowerCase().includes(currentSearchQuery);
-                const ingredients = drink.ingredients || [];
-                const ingredientMatch = currentSearchQuery === "" || ingredients.some(ing => ing.item.toLowerCase().includes(currentSearchQuery));
+            const searchTerms = currentSearchQuery.split(',')
+                .map(term => term.trim().toLowerCase())
+                .filter(term => term.length > 0);
 
-                // If category is selected, filter by it. Otherwise (e.g. "All" types), don't filter by category strictly unless it's part of the search.
+            const drinksToDisplay = Object.entries(allDrinks).filter(([id, drink]) => {
+                const matchesCategory = drink.categoryId === selectedCategoryId || (selectedCategoryId === 'all' && currentFilterType === 'Alles');
+                const matchesType = currentFilterType === "Alles" || drink.type === currentFilterType;
+                
+                let matchesSearch = true;
+                if (searchTerms.length > 0) {
+                    matchesSearch = searchTerms.every(term => {
+                        const nameMatchesTerm = drink.name.toLowerCase().includes(term);
+                        const ingredientItems = (drink.ingredients || []).map(ing => ing.item.toLowerCase());
+                        const ingredientMatchesTerm = ingredientItems.some(ingItem => ingItem.includes(term));
+                        return nameMatchesTerm || ingredientMatchesTerm;
+                    });
+                }
+
                 let categoryCondition = true;
                 if (selectedCategoryId && selectedCategoryId !== 'all') {
                     categoryCondition = drink.categoryId === selectedCategoryId;
-                    if (!allCategories[drink.categoryId] && drink.categoryId !== UNCATEGORIZED_ID) { // Handle drinks with orphaned category ID
-                         categoryCondition = selectedCategoryId === UNCATEGORIZED_ID; // Show in uncategorized
+                    if (!allCategories[drink.categoryId] && drink.categoryId !== UNCATEGORIZED_ID) {
+                         categoryCondition = selectedCategoryId === UNCATEGORIZED_ID;
                     }
                 }
-
-
-                return categoryCondition && matchesType && (nameMatch || ingredientMatch);
+                return categoryCondition && matchesType && matchesSearch;
             });
 
             if (drinksToDisplay.length === 0) {
                 noDrinksMessage.classList.remove('hidden');
-                noDrinksMessage.textContent = `Keine Drinks in "${currentCategoryName}" gefunden${currentSearchQuery ? ` für "${currentSearchQuery}"` : ''}.`;
+                noDrinksMessage.textContent = `Keine Drinks in "${currentCategoryName}" gefunden${currentSearchQuery ? ` für "${currentSearchQuery.split(',').join(', ')}"` : ''}.`;
                 if (editModeActive && selectedCategoryId && selectedCategoryId !== 'all') {
                     addDrinkButton.classList.remove('hidden');
                 } else {
@@ -257,36 +603,34 @@
                 return;
             }
 
-
             drinksToDisplay.forEach(([id, drink]) => {
                 const drinkCard = document.createElement('div');
-                drinkCard.className = 'bg-gray-800 p-6 rounded-xl shadow-lg drink-card';
+                drinkCard.className = 'bg-white dark:bg-gray-800 p-5 rounded-xl shadow-lg hover:shadow-xl drink-card';
                 drinkCard.innerHTML = `
                     <div class="flex justify-between items-start mb-3">
-                        <h3 class="text-2xl font-bold text-indigo-400">${drink.name} <span class="text-lg">${drink.symbols || ''}</span></h3>
-                        <span class="text-sm px-3 py-1 rounded-full ${drink.type === 'Mocktail' ? 'bg-green-600' : 'bg-red-600'}">${drink.type}</span>
+                        <h3 class="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">${drink.name} <span class="text-lg">${drink.symbols || ''}</span></h3>
+                        <span class="text-xs sm:text-sm px-3 py-1 rounded-full font-semibold ${drink.type === 'Mocktail' ? 'bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100' : 'bg-red-100 text-red-700 dark:bg-red-700 dark:text-red-100'}">${drink.type}</span>
                     </div>
-                    <div class="mb-4">
-                        <h4 class="font-semibold text-indigo-300 mb-1">Zutaten:</h4>
-                        <ul class="list-disc list-inside text-gray-300 space-y-1">
+                    <div class="mb-3">
+                        <h4 class="font-semibold text-indigo-500 dark:text-indigo-300 mb-1 text-sm">Zutaten:</h4>
+                        <ul class="list-disc list-inside text-gray-600 dark:text-gray-300 space-y-0.5 text-sm">
                             ${(drink.ingredients || []).map(ing => `<li>${ing.amount} ${ing.item}</li>`).join('')}
                         </ul>
                     </div>
-                    <div class="mb-4">
-                        <h4 class="font-semibold text-indigo-300 mb-1">Rezept:</h4>
-                        <p class="text-gray-400 text-sm">${drink.recipe}</p>
+                    <div class="mb-1">
+                        <h4 class="font-semibold text-indigo-500 dark:text-indigo-300 mb-1 text-sm">Rezept:</h4>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm">${drink.recipe}</p>
                     </div>
                     ${editModeActive ? `
-                        <div class="mt-4 pt-4 border-t border-gray-700 flex justify-end space-x-3">
-                            <button data-id="${id}" class="edit-drink-btn text-yellow-400 hover:text-yellow-300 px-3 py-1 rounded-md bg-gray-700 hover:bg-gray-600 transition-colors"><i class="fas fa-edit mr-1"></i> Bearbeiten</button>
-                            <button data-id="${id}" class="delete-drink-btn text-red-400 hover:text-red-300 px-3 py-1 rounded-md bg-gray-700 hover:bg-gray-600 transition-colors"><i class="fas fa-trash mr-1"></i> Löschen</button>
+                        <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-2">
+                            <button data-id="${id}" class="edit-drink-btn text-yellow-600 dark:text-yellow-400 hover:text-yellow-500 dark:hover:text-yellow-300 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-xs"><i class="fas fa-edit mr-1"></i> Bearbeiten</button>
+                            <button data-id="${id}" class="delete-drink-btn text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-xs"><i class="fas fa-trash mr-1"></i> Löschen</button>
                         </div>
                     ` : ''}
                 `;
                 drinksContainer.appendChild(drinkCard);
             });
 
-            // Add event listeners for edit/delete drink buttons
             document.querySelectorAll('.edit-drink-btn').forEach(btn => {
                 btn.addEventListener('click', () => handleEditDrink(btn.dataset.id));
             });
@@ -301,15 +645,13 @@
             }
         }
 
-
-        // --- Edit Mode ---
-        editModeButton.addEventListener('click', () => {
+        // --- Edit Mode --- (Button is now in settings modal)
+        modalEditModeButton.addEventListener('click', () => {
             if (editModeActive) {
-                // Exit edit mode
                 editModeActive = false;
                 updateEditModeUI();
             } else {
-                // Show access key modal
+                settingsModal.classList.add('hidden'); // Hide settings before showing key modal
                 accessKeyInput.value = '';
                 accessKeyError.textContent = '';
                 accessKeyModal.classList.remove('hidden');
@@ -329,44 +671,68 @@
                 accessKeyError.textContent = 'Ungültiger Schlüssel.';
             }
         });
-        document.getElementById('accessKeyCancel').addEventListener('click', () => accessKeyModal.classList.add('hidden'));
+        document.getElementById('accessKeyCancel').addEventListener('click', () => {
+            accessKeyModal.classList.add('hidden');
+            // Optionally re-open settings modal if desired, or let user click again
+            // settingsModal.classList.remove('hidden');
+        });
 
 
         function updateEditModeUI() {
             if (editModeActive) {
-                editModeButton.innerHTML = '<i class="fas fa-lock-open mr-2"></i> Bearbeitungsmodus Verlassen';
-                editModeButton.classList.remove('bg-green-500', 'hover:bg-green-600');
-                editModeButton.classList.add('bg-red-500', 'hover:bg-red-600');
-                editModeStatus.textContent = 'Bearbeitungsmodus Aktiv';
-                editModeStatus.classList.remove('bg-gray-600');
-                editModeStatus.classList.add('bg-yellow-500', 'text-gray-900');
+                modalEditModeButton.innerHTML = '<i class="fas fa-lock-open mr-2"></i> Bearbeitungsmodus Verlassen';
+                modalEditModeButton.classList.remove('bg-green-500', 'hover:bg-green-600', 'focus:ring-green-400');
+                modalEditModeButton.classList.add('bg-red-500', 'hover:bg-red-600', 'focus:ring-red-400');
+                modalEditModeStatusText.textContent = 'Aktiv';
+                modalEditModeStatusText.className = 'font-semibold text-green-600 dark:text-green-400';
+                
+                headerEditModeStatus.textContent = 'Bearbeitungsmodus Aktiv';
+                headerEditModeStatus.classList.remove('bg-gray-200', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-200', 'hidden');
+                headerEditModeStatus.classList.add('bg-yellow-400', 'text-yellow-800', 'dark:bg-yellow-500', 'dark:text-gray-900');
+
                 addCategoryButton.classList.remove('hidden');
                 if (selectedCategoryId && selectedCategoryId !== 'all') addDrinkButton.classList.remove('hidden');
 
             } else {
-                editModeButton.innerHTML = '<i class="fas fa-lock mr-2"></i> Bearbeitungsmodus';
-                editModeButton.classList.remove('bg-red-500', 'hover:bg-red-600');
-                editModeButton.classList.add('bg-green-500', 'hover:bg-green-600');
-                editModeStatus.textContent = 'Ansichtsmodus';
-                editModeStatus.classList.remove('bg-yellow-500', 'text-gray-900');
-                editModeStatus.classList.add('bg-gray-600');
+                modalEditModeButton.innerHTML = '<i class="fas fa-lock mr-2"></i> Bearbeitungsmodus Aktivieren';
+                modalEditModeButton.classList.remove('bg-red-500', 'hover:bg-red-600', 'focus:ring-red-400');
+                modalEditModeButton.classList.add('bg-green-500', 'hover:bg-green-600', 'focus:ring-green-400');
+                modalEditModeStatusText.textContent = 'Inaktiv';
+                modalEditModeStatusText.className = 'font-semibold text-red-600 dark:text-red-400';
+
+                headerEditModeStatus.textContent = 'Ansichtsmodus';
+                headerEditModeStatus.classList.add('hidden'); // Or style as 'view mode'
+                headerEditModeStatus.classList.remove('bg-yellow-400', 'text-yellow-800', 'dark:bg-yellow-500', 'dark:text-gray-900');
+                headerEditModeStatus.classList.add('bg-gray-200', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-200');
+
+
                 addCategoryButton.classList.add('hidden');
                 addDrinkButton.classList.add('hidden');
             }
-            renderCategories(); // Re-render to show/hide edit buttons
-            filterAndRenderDrinks(); // Re-render to show/hide edit buttons
+            renderCategories();
+            filterAndRenderDrinks();
         }
 
         // --- Search and Filter ---
-        searchInput.addEventListener('input', (e) => {
-            currentSearchQuery = e.target.value.toLowerCase();
+        function handleSearchInput(e) {
+            currentSearchQuery = e.target.value; // No toLowerCase here, handled in filter
+            // Sync both search inputs if needed, or treat them as one logical input
+            if (e.target.id === 'searchInput') searchInputMobile.value = currentSearchQuery;
+            if (e.target.id === 'searchInputMobile') searchInput.value = currentSearchQuery;
             filterAndRenderDrinks();
-        });
+        }
+        searchInput.addEventListener('input', handleSearchInput);
+        searchInputMobile.addEventListener('input', handleSearchInput);
+
 
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('bg-indigo-700', 'ring-2', 'ring-indigo-400'));
-                btn.classList.add('bg-indigo-700', 'ring-2', 'ring-indigo-400');
+                document.querySelectorAll('.filter-btn').forEach(b => {
+                    b.classList.remove('bg-indigo-600', 'dark:bg-indigo-500', 'text-white', 'ring-2', 'ring-indigo-400');
+                    b.classList.add('text-gray-700', 'dark:text-gray-300', 'hover:bg-indigo-500', 'dark:hover:bg-indigo-600', 'hover:text-white');
+                });
+                btn.classList.add('bg-indigo-600', 'dark:bg-indigo-500', 'text-white', 'ring-2', 'ring-indigo-400');
+                btn.classList.remove('text-gray-700', 'dark:text-gray-300');
                 currentFilterType = btn.dataset.type;
                 filterAndRenderDrinks();
             });
@@ -392,23 +758,22 @@
             const id = categoryIdInput.value;
             const name = document.getElementById('categoryName').value.trim();
             if (!name) {
-                alert("Kategoriename darf nicht leer sein."); // Replace with custom modal later
+                showCustomAlert("Kategoriename darf nicht leer sein.");
                 return;
             }
 
             const categoryData = { name };
             try {
-                if (id) { // Update existing
+                if (id) {
                     await update(child(dbRef, `barOrganizerData/categories/${id}`), categoryData);
-                } else { // Create new
+                } else {
                     const newCategoryRef = push(child(dbRef, 'barOrganizerData/categories'));
                     await set(newCategoryRef, categoryData);
                 }
                 categoryModal.classList.add('hidden');
-                // Data will refresh via onValue listener
             } catch (error) {
                 console.error("Fehler beim Speichern der Kategorie:", error);
-                alert("Fehler beim Speichern der Kategorie."); // Replace
+                showCustomAlert("Fehler beim Speichern der Kategorie.");
             }
         });
         document.getElementById('categoryCancel').addEventListener('click', () => categoryModal.classList.add('hidden'));
@@ -429,22 +794,20 @@
 
             showConfirmModal(`Sicher, dass du die Kategorie "${allCategories[id].name}" löschen willst? Alle Drinks darin werden als "Unkategorisiert" markiert.`, async () => {
                 try {
-                    // Move drinks to uncategorized
                     const updates = {};
                     Object.entries(allDrinks).forEach(([drinkId, drink]) => {
                         if (drink.categoryId === id) {
                             updates[`barOrganizerData/drinks/${drinkId}/categoryId`] = UNCATEGORIZED_ID;
                         }
                     });
-                    await update(dbRef, updates); // Perform all drink updates
-
-                    // Delete category
+                    if (Object.keys(updates).length > 0) {
+                        await update(dbRef, updates);
+                    }
                     await remove(child(dbRef, `barOrganizerData/categories/${id}`));
 
                     if (selectedCategoryId === id) {
-                        selectedCategoryId = UNCATEGORIZED_ID; // Fallback to uncategorized
+                        selectedCategoryId = UNCATEGORIZED_ID;
                     }
-                    // Data will refresh via onValue, which will re-render
                 } catch (error) {
                     console.error("Fehler beim Löschen der Kategorie:", error);
                     showCustomAlert("Fehler beim Löschen der Kategorie.");
@@ -452,13 +815,17 @@
             });
         }
 
-
         // --- Drink CRUD ---
         addDrinkButton.addEventListener('click', () => {
-            if (selectedCategoryId && selectedCategoryId !== 'all') {
+            if (selectedCategoryId && selectedCategoryId !== 'all' && allCategories[selectedCategoryId]) {
                 openDrinkModal(null, selectedCategoryId);
             } else {
-                showCustomAlert("Bitte wähle zuerst eine Kategorie aus der Liste links aus, um einen Drink hinzuzufügen.");
+                 const firstValidCategory = Object.keys(allCategories).find(catId => catId !== UNCATEGORIZED_ID && catId !== 'all') || Object.keys(allCategories)[0];
+                 if (firstValidCategory) {
+                    openDrinkModal(null, firstValidCategory);
+                 } else {
+                    showCustomAlert("Bitte erstelle zuerst eine Kategorie (außer 'Unkategorisiert'), um einen Drink hinzuzufügen.");
+                 }
             }
         });
 
@@ -466,7 +833,7 @@
         function populateCategorySelect(selectedDrinkCategoryId = null) {
             drinkCategorySelect.innerHTML = '';
             Object.entries(allCategories).forEach(([id, category]) => {
-                if (id === UNCATEGORIZED_ID && (!selectedDrinkCategoryId || selectedDrinkCategoryId !== UNCATEGORIZED_ID)) return; // Don't offer 'Uncategorized' unless editing a drink already in it
+                if (id === UNCATEGORIZED_ID && (!selectedDrinkCategoryId || selectedDrinkCategoryId !== UNCATEGORIZED_ID)) return;
                 const option = document.createElement('option');
                 option.value = id;
                 option.textContent = category.name;
@@ -475,26 +842,21 @@
                 }
                 drinkCategorySelect.appendChild(option);
             });
-             // If no category selected (e.g. new drink and current category is 'all'), select the current one
             if (!selectedDrinkCategoryId && selectedCategoryId && allCategories[selectedCategoryId] && selectedCategoryId !== 'all') {
                  drinkCategorySelect.value = selectedCategoryId;
             } else if (!selectedDrinkCategoryId && Object.keys(allCategories).length > 0) {
-                // Fallback to the first available category if nothing else makes sense
-                const firstValidCategory = Object.keys(allCategories).find(catId => catId !== UNCATEGORIZED_ID) || Object.keys(allCategories)[0];
+                const firstValidCategory = Object.keys(allCategories).find(catId => catId !== UNCATEGORIZED_ID && catId !== 'all') || Object.keys(allCategories)[0];
                 if(firstValidCategory) drinkCategorySelect.value = firstValidCategory;
             }
         }
 
-
         function openDrinkModal(id = null, currentCatId = null) {
             drinkForm.reset();
-            document.getElementById('ingredientsContainer').innerHTML = ''; // Clear previous ingredients
-            addIngredientField(); // Add one initial ingredient field
+            document.getElementById('ingredientsContainer').innerHTML = ''; 
+            addIngredientField(); 
 
             drinkIdInput.value = id || '';
-
             let drinkCategoryIdForSelect = currentCatId || selectedCategoryId;
-
 
             if (id && allDrinks[id]) {
                 drinkModalTitle.textContent = 'Drink Bearbeiten';
@@ -503,20 +865,18 @@
                 document.getElementById('drinkType').value = drink.type;
                 document.getElementById('drinkSymbols').value = drink.symbols || '';
                 document.getElementById('drinkRecipe').value = drink.recipe;
-                drinkCategoryIdForSelect = drink.categoryId; // Use the drink's actual category for the select
+                drinkCategoryIdForSelect = drink.categoryId; 
 
                 if (drink.ingredients && drink.ingredients.length > 0) {
-                    document.getElementById('ingredientsContainer').innerHTML = ''; // Clear initial blank field
+                    document.getElementById('ingredientsContainer').innerHTML = ''; 
                     drink.ingredients.forEach(ing => addIngredientField(ing.item, ing.amount));
                 }
             } else {
                 drinkModalTitle.textContent = 'Neuen Drink Erstellen';
-                 // For new drinks, pre-select the currently active category if it's not 'all'
                 if (selectedCategoryId && selectedCategoryId !== 'all' && allCategories[selectedCategoryId]) {
                     drinkCategoryIdForSelect = selectedCategoryId;
                 } else if (Object.keys(allCategories).length > 0) {
-                    // If 'all' is selected or no category, pick the first non-uncategorized one
-                    drinkCategoryIdForSelect = Object.keys(allCategories).find(catId => catId !== UNCATEGORIZED_ID) || Object.keys(allCategories)[0];
+                    drinkCategoryIdForSelect = Object.keys(allCategories).find(catId => catId !== UNCATEGORIZED_ID && catId !== 'all') || Object.keys(allCategories)[0];
                 }
             }
             populateCategorySelect(drinkCategoryIdForSelect);
@@ -554,14 +914,13 @@
             const drinkData = { name, type, categoryId, symbols, recipe, ingredients };
 
             try {
-                if (id) { // Update existing
+                if (id) {
                     await update(child(dbRef, `barOrganizerData/drinks/${id}`), drinkData);
-                } else { // Create new
+                } else {
                     const newDrinkRef = push(child(dbRef, 'barOrganizerData/drinks'));
                     await set(newDrinkRef, drinkData);
                 }
                 drinkModal.classList.add('hidden');
-                // Data will refresh via onValue listener
             } catch (error) {
                 console.error("Fehler beim Speichern des Drinks:", error);
                 showCustomAlert("Fehler beim Speichern des Drinks.");
@@ -576,14 +935,13 @@
             const newField = document.createElement('div');
             newField.className = 'ingredient-field flex space-x-2 mb-2 items-center';
             newField.innerHTML = `
-                <input type="text" name="ingredientItem" placeholder="Zutat" value="${item}" class="flex-grow bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
-                <input type="text" name="ingredientAmount" placeholder="Menge" value="${amount}" class="w-1/3 bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
-                <button type="button" class="remove-ingredient-btn text-red-500 hover:text-red-400 p-2 rounded-md bg-gray-600 hover:bg-gray-500"><i class="fas fa-minus-circle"></i></button>
+                <input type="text" name="ingredientItem" placeholder="Zutat" value="${item}" class="flex-grow bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm">
+                <input type="text" name="ingredientAmount" placeholder="Menge" value="${amount}" class="w-1/3 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm">
+                <button type="button" class="remove-ingredient-btn text-red-500 dark:text-red-400 hover:text-red-400 dark:hover:text-red-300 p-2 rounded-md bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"><i class="fas fa-minus-circle"></i></button>
             `;
             ingredientsContainer.appendChild(newField);
             newField.querySelector('.remove-ingredient-btn').addEventListener('click', () => newField.remove());
         }
-
 
         function handleEditDrink(id) {
             openDrinkModal(id);
@@ -593,7 +951,6 @@
             showConfirmModal(`Sicher, dass du den Drink "${allDrinks[id].name}" löschen willst?`, async () => {
                 try {
                     await remove(child(dbRef, `barOrganizerData/drinks/${id}`));
-                    // Data will refresh via onValue listener
                 } catch (error) {
                     console.error("Fehler beim Löschen des Drinks:", error);
                     showCustomAlert("Fehler beim Löschen des Drinks.");
@@ -615,181 +972,40 @@
             confirmModal.classList.add('hidden');
         });
 
-        // --- Custom Alert Modal (Simple Version) ---
-        const customAlertModal = document.getElementById('customAlertModal');
-        const customAlertText = document.getElementById('customAlertText');
-        const customAlertCloseBtn = document.getElementById('customAlertCloseBtn');
-
+        // --- Custom Alert Modal ---
+        const customAlertCloseButton = document.getElementById('customAlertCloseBtn');
         function showCustomAlert(message) {
             customAlertText.textContent = message;
             customAlertModal.classList.remove('hidden');
         }
-        customAlertCloseBtn.addEventListener('click', () => {
+        customAlertCloseButton.addEventListener('click', () => {
             customAlertModal.classList.add('hidden');
         });
 
 
         // --- Initial Load ---
         async function main() {
-            await initializeDefaultData(); // Check and set up default data if DB is empty
+            // Initialize theme first
+            const initialTheme = localStorage.getItem('theme') || 'system';
+            applyTheme(initialTheme);
+            
+            initializeSidebarState(); // Then sidebar
+            
+            await initializeDefaultData();
             loadData();
-            updateEditModeUI(); // Set initial UI state for edit mode
+            updateEditModeUI();
+            
             // Set default filter button active
-            document.querySelector('.filter-btn[data-type="Alles"]').classList.add('bg-indigo-700', 'ring-2', 'ring-indigo-400');
+            const defaultFilterBtn = document.querySelector('.filter-btn[data-type="Alles"]');
+            if (defaultFilterBtn) {
+                 defaultFilterBtn.classList.add('bg-indigo-600', 'dark:bg-indigo-500', 'text-white', 'ring-2', 'ring-indigo-400');
+                 defaultFilterBtn.classList.remove('text-gray-700', 'dark:text-gray-300');
+            }
         }
 
         main();
 
     </script>
-
-    <div class="min-h-screen flex flex-col md:flex-row">
-        <aside class="w-full md:w-1/4 bg-gray-800 p-6 space-y-4 shadow-lg">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-indigo-400">Kategorien</h2>
-                <button id="addCategoryButton" class="hidden bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-3 rounded-lg text-sm transition-colors">
-                    <i class="fas fa-plus mr-1"></i> Neu
-                </button>
-            </div>
-            <div id="categoriesContainer" class="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
-                </div>
-        </aside>
-
-        <main class="w-full md:w-3/4 p-6 md:p-10 bg-gray-900">
-            <header class="mb-8">
-                <div class="flex flex-col sm:flex-row justify-between items-center mb-6">
-                    <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 mb-4 sm:mb-0">
-                        Bar Organizer Deluxe
-                    </h1>
-                    <div class="flex items-center space-x-3">
-                        <span id="editModeStatus" class="px-3 py-1 rounded-full text-sm font-semibold bg-gray-600">Ansichtsmodus</span>
-                        <button id="editModeButton" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors">
-                            <i class="fas fa-lock mr-2"></i> Bearbeitungsmodus
-                        </button>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <input type="text" id="searchInput" placeholder="Suche nach Name oder Zutat..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow shadow-sm">
-                    <div class="flex space-x-2 bg-gray-800 p-1 rounded-lg shadow-sm">
-                        <button data-type="Alles" class="filter-btn flex-1 py-2 px-3 rounded-md text-sm font-medium hover:bg-indigo-600 transition-colors">Alles</button>
-                        <button data-type="Mocktail" class="filter-btn flex-1 py-2 px-3 rounded-md text-sm font-medium hover:bg-indigo-600 transition-colors">Mocktails</button>
-                        <button data-type="Cocktail" class="filter-btn flex-1 py-2 px-3 rounded-md text-sm font-medium hover:bg-indigo-600 transition-colors">Cocktails</button>
-                    </div>
-                </div>
-            </header>
-
-            <div class="flex justify-between items-center mb-6">
-                <h2 id="categoryTitle" class="text-3xl font-semibold text-indigo-300">Drinks</h2>
-                 <button id="addDrinkButton" class="hidden bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors">
-                    <i class="fas fa-plus mr-2"></i> Drink Hinzufügen
-                </button>
-            </div>
-            <div id="loadingIndicator" class="hidden text-center py-10">
-                <i class="fas fa-spinner fa-spin fa-3x text-indigo-400"></i>
-                <p class="mt-2 text-lg">Lade Daten...</p>
-            </div>
-            <div id="noDrinksMessage" class="hidden text-center py-10 text-gray-400 text-xl">
-                Keine Drinks gefunden.
-            </div>
-            <div id="drinksContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                </div>
-        </main>
-    </div>
-
-
-    <div id="accessKeyModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50">
-        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
-            <h3 class="text-2xl font-bold mb-6 text-indigo-400">Zugriffsschlüssel Eingeben</h3>
-            <input type="password" id="accessKeyInput" placeholder="Schlüssel" class="w-full bg-gray-700 border border-gray-600 rounded-md px-4 py-3 mb-4 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <p id="accessKeyError" class="text-red-400 text-sm mb-4 h-5"></p>
-            <div class="flex justify-end space-x-3">
-                <button id="accessKeyCancel" class="px-5 py-2 rounded-md bg-gray-600 hover:bg-gray-500 transition-colors">Abbrechen</button>
-                <button id="accessKeySubmit" class="px-5 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 transition-colors text-white">Bestätigen</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="drinkModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50 overflow-y-auto">
-        <form id="drinkForm" class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl space-y-6 max-h-[90vh] overflow-y-auto">
-            <h3 id="drinkModalTitle" class="text-2xl font-bold text-indigo-400">Drink Bearbeiten</h3>
-            <input type="hidden" id="drinkId">
-            <div>
-                <label for="drinkName" class="block text-sm font-medium text-gray-300 mb-1">Name*</label>
-                <input type="text" id="drinkName" required class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label for="drinkType" class="block text-sm font-medium text-gray-300 mb-1">Typ*</label>
-                    <select id="drinkType" required class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
-                        <option value="Mocktail">Mocktail</option>
-                        <option value="Cocktail">Cocktail</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="drinkCategory" class="block text-sm font-medium text-gray-300 mb-1">Kategorie*</label>
-                    <select id="drinkCategory" required class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
-                        </select>
-                </div>
-            </div>
-            <div>
-                <label for="drinkSymbols" class="block text-sm font-medium text-gray-300 mb-1">Symbole (Emoji)</label>
-                <input type="text" id="drinkSymbols" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Zutaten*</label>
-                <div id="ingredientsContainer" class="space-y-2">
-                    </div>
-                <button type="button" id="addIngredientBtn" class="mt-2 text-sm text-indigo-400 hover:text-indigo-300 font-semibold"><i class="fas fa-plus-circle mr-1"></i> Zutat hinzufügen</button>
-            </div>
-            <div>
-                <label for="drinkRecipe" class="block text-sm font-medium text-gray-300 mb-1">Rezept*</label>
-                <textarea id="drinkRecipe" rows="4" required class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
-            </div>
-            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-700">
-                <button type="button" id="drinkCancel" class="px-5 py-2 rounded-md bg-gray-600 hover:bg-gray-500 transition-colors">Abbrechen</button>
-                <button type="submit" class="px-5 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 transition-colors text-white">Speichern</button>
-            </div>
-        </form>
-    </div>
-
-    <div id="categoryModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50">
-        <form id="categoryForm" class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md space-y-6">
-            <h3 id="categoryModalTitle" class="text-2xl font-bold text-indigo-400">Kategorie Bearbeiten</h3>
-            <input type="hidden" id="categoryId">
-            <div>
-                <label for="categoryName" class="block text-sm font-medium text-gray-300 mb-1">Kategoriename*</label>
-                <input type="text" id="categoryName" required class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
-            </div>
-            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-700">
-                <button type="button" id="categoryCancel" class="px-5 py-2 rounded-md bg-gray-600 hover:bg-gray-500 transition-colors">Abbrechen</button>
-                <button type="submit" class="px-5 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 transition-colors text-white">Speichern</button>
-            </div>
-        </form>
-    </div>
-
-    <div id="confirmModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50">
-        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
-            <h3 class="text-xl font-semibold mb-4 text-yellow-400">Bestätigung</h3>
-            <p id="confirmModalText" class="text-gray-300 mb-6">Möchtest du wirklich fortfahren?</p>
-            <div class="flex justify-end space-x-3">
-                <button id="confirmNo" class="px-5 py-2 rounded-md bg-gray-600 hover:bg-gray-500 transition-colors">Nein</button>
-                <button id="confirmYes" class="px-5 py-2 rounded-md bg-red-600 hover:bg-red-700 transition-colors text-white">Ja</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="customAlertModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50">
-        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
-            <div class="flex items-center mb-4">
-                <i class="fas fa-exclamation-triangle text-yellow-400 text-2xl mr-3"></i>
-                <h3 class="text-xl font-semibold text-yellow-400">Hinweis</h3>
-            </div>
-            <p id="customAlertText" class="text-gray-300 mb-6">Eine Nachricht.</p>
-            <div class="flex justify-end">
-                <button id="customAlertCloseBtn" class="px-5 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 transition-colors text-white">OK</button>
-            </div>
-        </div>
-    </div>
 
 </body>
 </html>
