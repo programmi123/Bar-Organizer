@@ -51,15 +51,13 @@
              background-color: #6366f1 !important; /* indigo-500 */
         }
 
-        /* Ensure fixed header/sidebar don't hide content */
         body {
-            padding-top: 0; /* Header is sticky inside mainArea */
+            padding-top: 0; 
         }
         #mainArea {
-            padding-top: 0; /* Header is sticky inside mainArea */
+            padding-top: 0;
         }
 
-        /* Styling for theme option buttons */
         .theme-option-button.active {
             background-color: #4f46e5; /* indigo-600 */
             color: white;
@@ -69,16 +67,11 @@
              color: white;
         }
     </style>
-    <script>
-      // Tailwind dark mode configuration (class-based)
-      // This would typically be in tailwind.config.js, but for CDN we manage the class on <html>
-      // Ensure the 'dark' class on <html> triggers Tailwind's dark variants.
-    </script>
 </head>
 <body class="font-sans leading-normal tracking-normal bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-colors duration-300">
 
     <div class="flex h-screen overflow-hidden">
-        <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-gray-800 p-4 space-y-4 shadow-xl transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 ease-in-out print:hidden">
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-gray-800 p-4 space-y-4 shadow-xl transform transition-transform duration-300 ease-in-out print:hidden">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-indigo-600 dark:text-indigo-400">Kategorien</h2>
                 <button id="sidebarCloseBtn" class="md:hidden text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -94,7 +87,7 @@
 
         <div id="sidebarOverlay" class="fixed inset-0 z-30 bg-black opacity-50 hidden md:hidden print:hidden"></div>
 
-        <div id="mainArea" class="flex-1 flex flex-col overflow-auto transition-all duration-300 ease-in-out md:ml-64">
+        <div id="mainArea" class="flex-1 flex flex-col overflow-auto transition-all duration-300 ease-in-out">
             <header class="sticky top-0 bg-white dark:bg-gray-800 shadow-lg p-3 sm:p-4 z-20 print:hidden">
                 <div class="container mx-auto flex items-center justify-between">
                     <div class="flex items-center space-x-2 sm:space-x-4">
@@ -288,7 +281,7 @@
             authDomain: "bar-organizer-f3784.firebaseapp.com",
             databaseURL: "https://bar-organizer-f3784-default-rtdb.europe-west1.firebasedatabase.app",
             projectId: "bar-organizer-f3784",
-            storageBucket: "bar-organizer-f3784.appspot.com", // Corrected typical storage bucket format
+            storageBucket: "bar-organizer-f3784.appspot.com", 
             messagingSenderId: "908059088110",
             appId: "1:908059088110:web:03b861013c137ef1e2cfff",
             measurementId: "G-M99V8FNP35"
@@ -368,19 +361,19 @@
 
         // --- Sidebar Logic ---
         function toggleSidebar() {
-            // const isOpen = !sidebar.classList.contains('-translate-x-full'); // Check BEFORE toggle
-            sidebar.classList.toggle('-translate-x-full'); // Perform toggle
+            sidebar.classList.toggle('-translate-x-full');
+            const isMobile = window.innerWidth < 768;
+            const isSidebarOpen = !sidebar.classList.contains('-translate-x-full');
 
-            if (window.innerWidth < 768) { // Mobile behavior
-                sidebarOverlay.classList.toggle('hidden');
-                // mainArea margin is handled by Tailwind's md: prefix for desktop,
-                // and on mobile, it should not have this margin as sidebar overlays.
-            } else { // Desktop behavior (md and up)
-                sidebarOverlay.classList.add('hidden'); // Ensure overlay is always hidden
-                if (sidebar.classList.contains('-translate-x-full')) { // If sidebar is NOW hidden
-                    mainArea.classList.remove('md:ml-64');
-                } else { // If sidebar is NOW visible
+            if (isMobile) {
+                sidebarOverlay.classList.toggle('hidden', !isSidebarOpen);
+                mainArea.classList.remove('md:ml-64'); // Ensure no margin on mobile
+            } else { // Desktop
+                sidebarOverlay.classList.add('hidden'); // Always hidden on desktop
+                if (isSidebarOpen) {
                     mainArea.classList.add('md:ml-64');
+                } else {
+                    mainArea.classList.remove('md:ml-64');
                 }
             }
         }
@@ -388,21 +381,16 @@
         sidebarCloseBtn.addEventListener('click', toggleSidebar);
         sidebarOverlay.addEventListener('click', toggleSidebar);
 
-        function initializeSidebarState() { // This function is called on initial load and on resize
+        function initializeSidebarState() {
             const isMobile = window.innerWidth < 768;
-
             if (isMobile) {
-                mainArea.classList.remove('md:ml-64'); // Ensure main area has no explicit left margin on mobile
-                // Show/hide overlay based on whether sidebar is currently expanded or collapsed
-                sidebarOverlay.classList.toggle('hidden', sidebar.classList.contains('-translate-x-full'));
-            } else { // Desktop
-                sidebarOverlay.classList.add('hidden'); // Overlay is never used on desktop
-                // Adjust mainArea margin based on sidebar's current state
-                if (sidebar.classList.contains('-translate-x-full')) { // If sidebar is collapsed
-                    mainArea.classList.remove('md:ml-64');
-                } else { // If sidebar is expanded (not -translate-x-full)
-                    mainArea.classList.add('md:ml-64');
-                }
+                sidebar.classList.add('-translate-x-full');
+                mainArea.classList.remove('md:ml-64');
+                sidebarOverlay.classList.add('hidden');
+            } else { // Desktop: Default to open
+                sidebar.classList.remove('-translate-x-full');
+                mainArea.classList.add('md:ml-64');
+                sidebarOverlay.classList.add('hidden');
             }
         }
         window.addEventListener('resize', initializeSidebarState);
@@ -410,18 +398,21 @@
 
         // --- Theme Switcher Logic ---
         function applyTheme(themeToApply) {
+            // console.log(`Applying theme choice: ${themeToApply}`);
             const htmlEl = document.documentElement;
             let finalTheme = themeToApply;
 
             if (themeToApply === 'system') {
                 finalTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                // console.log(`System theme resolved to: ${finalTheme}`);
             }
 
             if (finalTheme === 'dark') {
                 htmlEl.classList.add('dark');
             } else {
-                htmlEl.classList.remove('dark'); // Light theme is default (no 'dark' class)
+                htmlEl.classList.remove('dark');
             }
+            // console.log(`html.classList after theme application: ${htmlEl.className}`);
             localStorage.setItem('theme', themeToApply); // Store the user's *choice* (light, dark, or system)
             updateThemeButtonsState(themeToApply);
         }
@@ -442,9 +433,11 @@
             });
         });
 
+        // Listen for OS theme changes if "system" is selected
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-            if (localStorage.getItem('theme') === 'system') {
-                applyTheme('system');
+            const storedThemePreference = localStorage.getItem('theme');
+            if (storedThemePreference === 'system') {
+                applyTheme('system'); // Re-apply to reflect OS change
             }
         });
         
@@ -652,13 +645,13 @@
             }
         }
 
-        // --- Edit Mode --- (Button is now in settings modal)
+        // --- Edit Mode ---
         modalEditModeButton.addEventListener('click', () => {
             if (editModeActive) {
                 editModeActive = false;
                 updateEditModeUI();
             } else {
-                settingsModal.classList.add('hidden'); // Hide settings before showing key modal
+                settingsModal.classList.add('hidden'); 
                 accessKeyInput.value = '';
                 accessKeyError.textContent = '';
                 accessKeyModal.classList.remove('hidden');
@@ -680,8 +673,6 @@
         });
         document.getElementById('accessKeyCancel').addEventListener('click', () => {
             accessKeyModal.classList.add('hidden');
-            // Optionally re-open settings modal if desired, or let user click again
-            // settingsModal.classList.remove('hidden');
         });
 
 
@@ -708,7 +699,7 @@
                 modalEditModeStatusText.className = 'font-semibold text-red-600 dark:text-red-400';
 
                 headerEditModeStatus.textContent = 'Ansichtsmodus';
-                headerEditModeStatus.classList.add('hidden'); // Or style as 'view mode'
+                headerEditModeStatus.classList.add('hidden'); 
                 headerEditModeStatus.classList.remove('bg-yellow-400', 'text-yellow-800', 'dark:bg-yellow-500', 'dark:text-gray-900');
                 headerEditModeStatus.classList.add('bg-gray-200', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-200');
 
@@ -722,8 +713,7 @@
 
         // --- Search and Filter ---
         function handleSearchInput(e) {
-            currentSearchQuery = e.target.value; // No toLowerCase here, handled in filter
-            // Sync both search inputs if needed, or treat them as one logical input
+            currentSearchQuery = e.target.value; 
             if (e.target.id === 'searchInput') searchInputMobile.value = currentSearchQuery;
             if (e.target.id === 'searchInputMobile') searchInput.value = currentSearchQuery;
             filterAndRenderDrinks();
@@ -828,7 +818,7 @@
                 openDrinkModal(null, selectedCategoryId);
             } else {
                  const firstValidCategory = Object.keys(allCategories).find(catId => catId !== UNCATEGORIZED_ID && catId !== 'all') || Object.keys(allCategories)[0];
-                 if (firstValidCategory) {
+                 if (firstValidCategory && allCategories[firstValidCategory]) { // Ensure category exists
                     openDrinkModal(null, firstValidCategory);
                  } else {
                     showCustomAlert("Bitte erstelle zuerst eine Kategorie (außer 'Unkategorisiert'), um einen Drink hinzuzufügen.");
@@ -886,7 +876,7 @@
                     drinkCategoryIdForSelect = Object.keys(allCategories).find(catId => catId !== UNCATEGORIZED_ID && catId !== 'all') || Object.keys(allCategories)[0];
                 }
             }
-            populateCategorySelect(drinkCategoryIdForSelect);
+            populateCategorySelect(drinkCategoryIdForSelect); // Ensure this uses the resolved ID
             drinkModal.classList.remove('hidden');
         }
 
@@ -895,12 +885,16 @@
             const id = drinkIdInput.value;
             const name = document.getElementById('drinkName').value.trim();
             const type = document.getElementById('drinkType').value;
-            const categoryId = drinkCategorySelect.value;
+            const categoryId = drinkCategorySelect.value; // This should now be correctly populated
             const symbols = document.getElementById('drinkSymbols').value.trim();
             const recipe = document.getElementById('drinkRecipe').value.trim();
 
             if (!name || !type || !categoryId || !recipe) {
                 showCustomAlert("Bitte fülle alle Pflichtfelder aus (Name, Typ, Kategorie, Rezept).");
+                return;
+            }
+             if (!allCategories[categoryId]) { // Check if categoryId is valid
+                showCustomAlert("Ungültige Kategorie ausgewählt. Bitte erstelle zuerst eine Kategorie.");
                 return;
             }
 
@@ -992,17 +986,15 @@
 
         // --- Initial Load ---
         async function main() {
-            // Initialize theme first
             const initialTheme = localStorage.getItem('theme') || 'system';
             applyTheme(initialTheme);
             
-            initializeSidebarState(); // Then sidebar state based on current view
+            initializeSidebarState(); 
             
             await initializeDefaultData();
             loadData();
             updateEditModeUI();
             
-            // Set default filter button active
             const defaultFilterBtn = document.querySelector('.filter-btn[data-type="Alles"]');
             if (defaultFilterBtn) {
                  defaultFilterBtn.classList.add('bg-indigo-600', 'dark:bg-indigo-500', 'text-white', 'ring-2', 'ring-indigo-400');
