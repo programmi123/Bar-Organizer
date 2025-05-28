@@ -9,6 +9,8 @@
 <body>
   <div class="container">
     <h1>Mocktail- und Cocktail-Rezepte</h1>
+
+    <!-- Suchfeld + Filter-Buttons -->
     <input
       type="text"
       id="search"
@@ -24,19 +26,76 @@
       </button>
       <button id="btnAll" onclick="filterByType('Alles')">Alles</button>
     </div>
+
+    <!-- Ergebnis-Liste -->
     <div id="results"></div>
+
+    <hr />
+
+    <!-- Neues Rezept erstellen -->
+    <h2>Neues Rezept erstellen</h2>
+    <form id="newRecipeForm">
+      <!-- 1) Name -->
+      <div>
+        <label for="newName">Name:</label>
+        <input type="text" id="newName" required />
+      </div>
+
+      <!-- 2) Typ (Mocktail oder Cocktail) -->
+      <div>
+        <label for="newType">Typ:</label>
+        <select id="newType" required>
+          <option value="">-- Auswählen --</option>
+          <option value="Mocktail">Mocktail</option>
+          <option value="Cocktail">Cocktail</option>
+        </select>
+      </div>
+
+      <!-- 3) Symbole (z.B. 🍸) -->
+      <div>
+        <label for="newSymbols">Symbole (Emoji/Texte):</label>
+        <input type="text" id="newSymbols" placeholder="z.B. 🍸" />
+      </div>
+
+      <!-- 4) Zutaten (dynamisch mehrere Einträge) -->
+      <div id="ingredientsContainer">
+        <label>Zutaten:</label>
+        <div class="ingredient-row">
+          <input
+            type="text"
+            class="ingredient-amount"
+            placeholder="Menge (z.B. 50ml)"
+            required
+          />
+          <input
+            type="text"
+            class="ingredient-item"
+            placeholder="Zutat (z.B. Weißer Rum)"
+            required
+          />
+          <button type="button" class="remove-ingredient">–</button>
+        </div>
+      </div>
+      <button type="button" id="addIngredient">+ Zutat hinzufügen</button>
+
+      <!-- 5) Zubereitung / Anleitung -->
+      <div>
+        <label for="newRecipeText">Anleitung:</label>
+        <textarea id="newRecipeText" rows="4" required></textarea>
+      </div>
+
+      <div>
+        <button type="submit">Rezept absenden</button>
+      </div>
+    </form>
   </div>
 
   <!-- Firebase SDKs -->
   <script type="module">
-    // 1. Core SDKs for App & Analytics (already there)
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-analytics.js";
-
-    // 2. Add the Realtime Database SDK
     import { getDatabase } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
 
-    // 3. Your web app's Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyAVEM6X3OEUuCDBrpShe02Rnq8p13oEf4s",
       authDomain: "bar-organizer-f3784.firebaseapp.com",
@@ -49,15 +108,13 @@
       measurementId: "G-M99V8FNP35",
     };
 
-    // 4. Initialize Firebase
+    // Firebase initialisieren
     export const app = initializeApp(firebaseConfig);
     export const analytics = getAnalytics(app);
-
-    // 5. Initialize and export the Database instance
     export const db = getDatabase(app);
   </script>
 
-  <!-- Your custom script, now as an ES module -->
-  <script type="module" src="scripts/main2.js"></script>
+  <!-- eigenes Script als ES-Modul -->
+  <script type="module" src="scripts/main.js"></script>
 </body>
 </html>
