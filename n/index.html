@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0">
+    <title>Bar Organizer Deluxe</title>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="BarOrganizer">
+
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon-180x180.png" onerror="this.href='https://placehold.co/180x180/indigo/white?text=Icon'">
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/apple-touch-icon-152x152.png" onerror="this.href='https://placehold.co/152x152/indigo/white?text=Icon'">
+    <link rel="apple-touch-icon" sizes="167x167" href="icons/apple-touch-icon-167x167.png" onerror="this.href='https://placehold.co/167x167/indigo/white?text=Icon'">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180x180.png" onerror="this.href='https://placehold.co/180x180/indigo/white?text=Icon'">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png" onerror="this.href='https://placehold.co/32x32/indigo/white?text=Icon'">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16x16.png" onerror="this.href='https://placehold.co/16x16/indigo/white?text=Icon'">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png" onerror="this.href='https://placehold.co/192x192/indigo/white?text=Icon'">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <!-- SortableJS for drag-and-drop -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <style>
+        /* Custom scrollbar for webkit browsers (light theme) */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f3f4f6; /* gray-100 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #9ca3af; /* gray-400 */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; /* gray-500 */
+        }
+
+        /* Custom scrollbar for webkit browsers (dark theme) */
+        .dark ::-webkit-scrollbar-track {
+            background: #374151; /* gray-700 */
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #6b7280; /* gray-500 */
+        }
+        .dark ::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af; /* gray-400 */
+        }
+
+        .drink-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .drink-card:hover {
+            transform: translateY(-5px);
+        }
+        .modal-backdrop { /* Applied to modal wrapper divs */
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+        }
+        .category-active {
+            background-color: #4f46e5 !important; /* indigo-600 */
+            color: white !important;
+        }
+        .dark .category-active {
+             background-color: #6366f1 !important; /* indigo-500 */
+        }
+
+        body {
+            padding-top: 0;
+            /* Prevent text selection */
+            -webkit-user-select: none; /* Safari */
+            -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* IE10+/Edge */
+            user-select: none; /* Standard */
+            -webkit-touch-callout: none; /* iOS Safari */
+            overscroll-behavior: none; /* Prevent pull-to-refresh style behaviors that can interfere with UX */
+        }
+        html {
+            overscroll-behavior: none;
+        }
+
+        #mainArea {
+            padding-top: 0;
+        }
+
+        .theme-option-button.active {
+            background-color: #4f46e5; /* indigo-600 */
+            color: white;
+        }
+        .dark .theme-option-button.active {
+            background-color: #6366f1; /* indigo-500 */
+             color: white;
+        }
+        .staff-action-btn { /* For sidebar staff buttons */
+            font-size: 0.75rem; /* text-xs */
+            padding: 0.25rem 0.5rem; /* py-1 px-2 */
+            border-radius: 0.375rem; /* rounded-md */
+            transition: background-color 0.15s ease-in-out;
+        }
+        .staff-action-main-btn { /* For main area staff buttons */
+            font-weight: 600; /* semibold */
+            padding: 0.5rem 0.75rem; /* py-2 px-3 */
+            border-radius: 0.5rem; /* rounded-lg */
+            font-size: 0.875rem; /* text-sm (for sm screens and up) */
+            transition: background-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1); /* shadow-md */
+        }
+        .staff-action-main-btn:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1); /* shadow-lg */
+        }
+        .home-folder-icon.is-home {
+            color: #fbbf24; /* amber-400 */
+        }
+         .home-folder-icon:not(.is-home) {
+            color: #9ca3af; /* gray-400 */
+        }
+        .dark .home-folder-icon:not(.is-home) {
+            color: #6b7280; /* gray-500 */
+        }
+        .home-folder-icon:hover {
+            color: #f59e0b; /* amber-500 */
+        }
+        .quick-confirm-btn {
+            padding: 0.375rem; /* py-1.5 px-1.5 for a small square-ish button */
+            font-size: 0.75rem; /* text-xs */
+        }
+        /* Styles for the recipe popup */
+        #recipePopupModal .recipe-content-container {
+            max-height: 70vh; 
+            overflow-y: auto;
+        }
+        /* Styles for drag-and-drop reordering */
+        .sortable-ghost {
+            opacity: 0.4;
+            background: #c7d2fe; /* indigo-200 */
+        }
+        .drag-handle {
+            cursor: move; /* Grab cursor */
+            padding-right: 8px; /* Some space around the handle */
+        }
+    </style>
+</head>
+<body class="font-sans leading-normal tracking-normal bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-colors duration-300">
+
+    <div class="flex h-screen overflow-hidden">
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-gray-800 p-4 space-y-4 shadow-xl transform transition-transform duration-300 ease-in-out print:hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-indigo-600 dark:text-indigo-400">Ordner</h2>
+                <button id="sidebarCloseBtn" class="md:hidden text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <i class="fas fa-times fa-lg"></i>
+                </button>
+            </div>
+            <div id="categoriesContainer" class="space-y-1.5 max-h-[calc(100vh-180px)] overflow-y-auto pr-1">
+                <!-- Categories will be rendered here by JS -->
+            </div>
+            <button id="addCategoryButton" class="hidden w-full mt-auto bg-green-500 hover:bg-green-600 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75">
+                <i class="fas fa-plus mr-2"></i> Ordner
+            </button>
+        </aside>
+
+        <div id="sidebarOverlay" class="fixed inset-0 z-30 bg-black opacity-50 hidden md:hidden print:hidden"></div>
+
+        <div id="mainArea" class="flex-1 flex flex-col overflow-auto transition-all duration-300 ease-in-out">
+            <header class="sticky top-0 bg-white dark:bg-gray-800 shadow-lg p-3 sm:p-4 z-20 print:hidden">
+                <div class="container mx-auto flex items-center justify-between">
+                    <div class="flex items-center space-x-2 sm:space-x-4">
+                        <button id="sidebarOpenBtn" class="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 focus:outline-none p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <i class="fas fa-bars fa-lg"></i>
+                        </button>
+                        <h1 class="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500">
+                            Bar Organizer Deluxe
+                        </h1>
+                    </div>
+
+                    <div class="flex items-center space-x-2 sm:space-x-3">
+                         <div class="relative hidden sm:block">
+                            <input type="text" id="searchInput" placeholder="Suche Drinks, Zutaten (A,B)..." class="w-full md:w-56 lg:w-72 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-shadow shadow-sm">
+                            <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 pointer-events-none">
+                                <i class="fas fa-search"></i>
+                            </span>
+                        </div>
+                        <span id="headerModeStatus" class="hidden px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">Ansichtsmodus</span>
+                        <button id="settingsButton" class="p-2 rounded-full text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <i class="fas fa-cog fa-lg"></i>
+                        </button>
+                    </div>
+                </div>
+                 <div class="mt-2 sm:hidden px-2"> <div class="relative">
+                        <input type="text" id="searchInputMobile" placeholder="Suche Drinks, Zutaten (A,B)..." class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-shadow shadow-sm">
+                        <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 pointer-events-none">
+                            <i class="fas fa-search"></i>
+                        </span>
+                    </div>
+                </div>
+            </header>
+
+            <main class="flex-1 p-4 sm:p-6 md:p-8">
+                <div class="flex flex-col sm:flex-row justify-between items-start mb-4 sm:mb-6">
+                    <div class="flex flex-wrap items-center gap-2 mb-3 sm:mb-0">
+                        <div class="flex space-x-1 bg-gray-200 dark:bg-gray-700 p-1 rounded-lg shadow-sm">
+                            <button data-type="Alles" class="filter-btn flex-1 py-2 px-3 rounded-md text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-indigo-500 dark:hover:bg-indigo-600 hover:text-white dark:hover:text-white transition-colors">Alles</button>
+                            <button data-type="Mocktail" class="filter-btn flex-1 py-2 px-3 rounded-md text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-indigo-500 dark:hover:bg-indigo-600 hover:text-white dark:hover:text-white transition-colors">Mocktails</button>
+                            <button data-type="Cocktail" class="filter-btn flex-1 py-2 px-3 rounded-md text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-indigo-500 dark:hover:bg-indigo-600 hover:text-white dark:hover:text-white transition-colors">Cocktails</button>
+                        </div>
+                        <button id="staffAddExistingDrinkMainBtn" class="hidden staff-action-main-btn bg-sky-500 hover:bg-sky-600 text-white">
+                            <i class="fas fa-search-plus mr-1 sm:mr-2"></i><span class="hidden sm:inline">Drink Hinzuf.</span><span class="sm:hidden">+Drink</span>
+                        </button>
+                        <button id="staffAddNewRecipeMainBtn" class="hidden staff-action-main-btn bg-teal-500 hover:bg-teal-600 text-white">
+                            <i class="fas fa-file-alt mr-1 sm:mr-2"></i><span class="hidden sm:inline">Rezept Hinzuf.</span><span class="sm:hidden">+Rezept</span>
+                        </button>
+                         <button id="editModeCloneDrinkBtn" class="hidden staff-action-main-btn bg-sky-500 hover:bg-sky-600 text-white">
+                            <i class="fas fa-clone mr-1 sm:mr-2"></i><span class="hidden sm:inline">Drink Klonen</span><span class="sm:hidden">Klon</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center mb-4 sm:mb-6">
+                    <div class="flex items-center gap-3">
+                        <h2 id="categoryTitle" class="text-xl sm:text-2xl md:text-3xl font-semibold text-indigo-700 dark:text-indigo-300">Drinks</h2>
+                        <button id="staffPurgeCategoryBtn" class="hidden staff-action-main-btn bg-red-600 hover:bg-red-700 text-white py-1.5 px-3 text-xs sm:text-sm">
+                            <i class="fas fa-dumpster-fire mr-1"></i> Ordner Leeren
+                        </button>
+                    </div>
+                     <button id="addDrinkButton" class="hidden bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-opacity-75">
+                        <i class="fas fa-plus mr-2"></i> Drink
+                    </button>
+                </div>
+                <div id="loadingIndicator" class="text-center py-10"> <i class="fas fa-spinner fa-spin fa-3x text-indigo-500 dark:text-indigo-400"></i>
+                    <p class="mt-3 text-lg text-gray-600 dark:text-gray-400">Lade Daten...</p>
+                </div>
+                 <div id="noCategoriesMessage" class="hidden text-center py-10 text-gray-500 dark:text-gray-400 text-xl">
+                    Bitte erstelle zuerst einen Ordner im Bearbeitungsmodus.
+                </div>
+                <div id="noDrinksMessage" class="hidden text-center py-10 text-gray-500 dark:text-gray-400 text-xl">
+                    Keine Drinks gefunden.
+                </div>
+                <div id="drinksContainer" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                    <!-- Drinks will be rendered here -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="settingsModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50 print:hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl w-full max-w-md space-y-6">
+            <div class="flex justify-between items-center">
+                <h3 class="text-xl font-semibold text-gray-800 dark:text-gray-100">Einstellungen</h3>
+                <button id="closeSettingsModal" class="text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500">
+                    <i class="fas fa-times fa-lg"></i>
+                </button>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Theme</label>
+                <div class="flex space-x-2 rounded-lg bg-gray-100 dark:bg-gray-700 p-1">
+                    <button data-theme-value="light" class="theme-option-button flex-1 py-2 px-3 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Light</button>
+                    <button data-theme-value="dark" class="theme-option-button flex-1 py-2 px-3 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Dark</button>
+                    <button data-theme-value="system" class="theme-option-button flex-1 py-2 px-3 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">System</button>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Bearbeitungsmodus</label>
+                <button id="modalEditModeButton" class="w-full text-white font-semibold py-2.5 px-4 rounded-lg shadow-md hover:shadow-lg transition-colors flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-opacity-75">
+                    <!-- Content set by JS -->
+                </button>
+                 <p class="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">Status: <span id="modalEditModeStatusText" class="font-semibold">Aus</span></p>
+            </div>
+             <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Personal Modus</label>
+                <button id="modalStaffModeButton" class="w-full text-white font-semibold py-2.5 px-4 rounded-lg shadow-md hover:shadow-lg transition-colors flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-opacity-75">
+                    <!-- Content set by JS -->
+                </button>
+                 <p class="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">Status: <span id="modalStaffModeStatusText" class="font-semibold">Aus</span></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="accessKeyModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-[60] print:hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h3 class="text-xl sm:text-2xl font-bold mb-6 text-indigo-600 dark:text-indigo-400">Zugriffsschlüssel (Bearbeitung)</h3>
+            <input type="password" id="accessKeyInput" placeholder="Schlüssel" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-4 py-3 mb-1 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+            <p id="accessKeyError" class="text-red-500 dark:text-red-400 text-sm mt-1 mb-4 h-5"></p>
+            <div class="flex justify-end space-x-3">
+                <button id="accessKeyCancel" class="px-5 py-2.5 rounded-md bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">Abbrechen</button>
+                <button id="accessKeySubmit" class="px-5 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">Bestätigen</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="staffAccessKeyModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-[60] print:hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h3 class="text-xl sm:text-2xl font-bold mb-6 text-purple-600 dark:text-purple-400">Zugriffsschlüssel (Personal)</h3>
+            <input type="password" id="staffAccessKeyInput" placeholder="Personal Schlüssel" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-4 py-3 mb-1 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none">
+            <p id="staffAccessKeyError" class="text-red-500 dark:text-red-400 text-sm mt-1 mb-4 h-5"></p>
+            <div class="flex justify-end space-x-3">
+                <button id="staffAccessKeyCancel" class="px-5 py-2.5 rounded-md bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">Abbrechen</button>
+                <button id="staffAccessKeySubmit" class="px-5 py-2.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-purple-400">Bestätigen</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="drinkModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50 overflow-y-auto print:hidden">
+        <form id="drinkForm" class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <h3 id="drinkModalTitle" class="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">Drink Bearbeiten</h3>
+            <input type="hidden" id="drinkId">
+            <input type="hidden" id="drinkModalTargetCategoryId">
+            <div>
+                <label for="drinkName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name*</label>
+                <input type="text" id="drinkName" required class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="drinkType" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Typ*</label>
+                    <select id="drinkType" required class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                        <option value="Mocktail">Mocktail</option>
+                        <option value="Cocktail">Cocktail</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="drinkCategory" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ordner*</label>
+                    <select id="drinkCategory" required class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                        <!-- Options populated by JS -->
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label for="drinkImageUrl" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bild-URL</label>
+                <input type="url" id="drinkImageUrl" placeholder="https://beispiel.com/bild.jpg" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+            </div>
+            <div>
+                <label for="drinkSymbols" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Symbole (Emoji)</label>
+                <input type="text" id="drinkSymbols" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Zutaten*</label>
+                <div id="ingredientsContainer" class="space-y-2">
+                    <!-- Ingredients populated by JS -->
+                </div>
+                <button type="button" id="addIngredientBtn" class="mt-2 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 font-semibold focus:outline-none"><i class="fas fa-plus-circle mr-1"></i> Zutat hinzufügen</button>
+            </div>
+            <div>
+                <label for="drinkRecipe" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rezept*</label>
+                <textarea id="drinkRecipe" rows="4" required class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none"></textarea>
+            </div>
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button type="button" id="drinkCancel" class="px-5 py-2.5 rounded-md bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">Abbrechen</button>
+                <button type="submit" class="px-5 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">Speichern</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="categoryModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50 print:hidden">
+        <form id="categoryForm" class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-md space-y-6">
+            <h3 id="categoryModalTitle" class="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">Ordner Bearbeiten</h3>
+            <input type="hidden" id="categoryId">
+            <div>
+                <label for="categoryName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ordnername*</label>
+                <input type="text" id="categoryName" required class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+            </div>
+            <div id="categoryStaffSettingsOuterContainer" class="hidden pt-4 border-t border-gray-200 dark:border-gray-700">
+                 <h4 class="text-md font-semibold text-gray-700 dark:text-gray-300 mb-3">Personal Modus Einstellungen für diesen Ordner</h4>
+                <div id="categoryStaffSettingsContainer" class="space-y-3">
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="categoryEnableStaffAddDrink" class="form-checkbox h-5 w-5 text-indigo-600 dark:text-indigo-500 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Darf "+ Drink" (vorhandenen) nutzen</span>
+                    </label>
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="categoryEnableStaffAddRezept" class="form-checkbox h-5 w-5 text-indigo-600 dark:text-indigo-500 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Darf "+ Rezept" (neues) nutzen</span>
+                    </label>
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="categoryEnableStaffDeleteDrink" class="form-checkbox h-5 w-5 text-indigo-600 dark:text-indigo-500 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Darf einzelne Drinks löschen</span>
+                    </label>
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="categoryEnableStaffPurgeFolder" class="form-checkbox h-5 w-5 text-indigo-600 dark:text-indigo-500 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Darf ganzen Ordner leeren</span>
+                    </label>
+                    <div class="pt-2">
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="categoryEnableStaffQuickConfirm" class="form-checkbox h-5 w-5 text-indigo-600 dark:text-indigo-500 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500">
+                            <span class="text-sm text-gray-700 dark:text-gray-300">Darf Schnellbestätigung nutzen</span>
+                        </label>
+                    </div>
+                    <div id="quickConfirmTargetFolderContainer" class="hidden pl-8 space-y-1">
+                        <label for="categoryQuickConfirmTargetFolder" class="block text-xs font-medium text-gray-600 dark:text-gray-400">Zielordner für Schnellbestätigung:</label>
+                        <select id="categoryQuickConfirmTargetFolder" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                            <!-- Options populated by JS -->
+                        </select>
+                    </div>
+                    <div class="pt-2 border-t border-gray-200 dark:border-gray-600 mt-3">
+                        <label class="flex items-center space-x-3 cursor-pointer mt-3">
+                            <input type="checkbox" id="categoryEnableRecipePopup" class="form-checkbox h-5 w-5 text-indigo-600 dark:text-indigo-500 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500">
+                            <span class="text-sm text-gray-700 dark:text-gray-300">Rezept-Popup bei Doppelklick erlauben</span>
+                        </label>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 pl-8">Ermöglicht allen Nutzern, Rezepte dieses Ordners per Doppelklick groß anzuzeigen.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button type="button" id="categoryCancel" class="px-5 py-2.5 rounded-md bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">Abbrechen</button>
+                <button type="submit" class="px-5 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">Speichern</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="addExistingDrinkModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50 overflow-y-auto print:hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-2xl space-y-5 max-h-[90vh] flex flex-col">
+            <h3 class="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400">Vorhandenen Drink Hinzufügen</h3>
+            <input type="hidden" id="addExistingDrinkTargetCategoryId">
+            <div>
+                <label for="sourceCategorySelect" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quell-Ordner</label>
+                <select id="sourceCategorySelect" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-purple-500 focus:border-purple-500 outline-none">
+                    <!-- Options populated by JS -->
+                </select>
+            </div>
+            <div>
+                <label for="sourceDrinkSearch" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Suche Drink in Quell-Ordner</label>
+                <input type="text" id="sourceDrinkSearch" placeholder="Drinkname suchen..." class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-purple-500 focus:border-purple-500 outline-none">
+            </div>
+            <div id="sourceDrinksListContainer" class="flex-grow overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-md p-3 space-y-2 bg-gray-50 dark:bg-gray-700/50 min-h-[200px]">
+                <p class="text-sm text-gray-500 dark:text-gray-400">Bitte Quell-Ordner wählen.</p>
+            </div>
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button type="button" id="addExistingDrinkCancel" class="px-5 py-2.5 rounded-md bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">Abbrechen</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-[70] print:hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h3 class="text-lg sm:text-xl font-semibold mb-4 text-yellow-600 dark:text-yellow-400">Bestätigung</h3>
+            <p id="confirmModalText" class="text-gray-700 dark:text-gray-300 mb-6">Möchtest du wirklich fortfahren?</p>
+            <div class="flex justify-end space-x-3">
+                <button id="confirmNo" class="px-5 py-2.5 rounded-md bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">Nein</button>
+                <button id="confirmYes" class="px-5 py-2.5 rounded-md bg-red-600 hover:bg-red-700 text-white transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-400">Ja</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="customAlertModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-[70] print:hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <div class="flex items-center mb-4">
+                <i class="fas fa-exclamation-triangle text-yellow-500 dark:text-yellow-400 text-2xl mr-3"></i>
+                <h3 class="text-lg sm:text-xl font-semibold text-yellow-600 dark:text-yellow-400">Hinweis</h3>
+            </div>
+            <p id="customAlertText" class="text-gray-700 dark:text-gray-300 mb-6">Eine Nachricht.</p>
+            <div class="flex justify-end">
+                <button id="customAlertCloseBtn" class="px-5 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-400">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="recipePopupModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-[65] print:hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-xl space-y-5 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center">
+                <h3 id="recipePopupTitle" class="text-2xl font-bold text-indigo-700 dark:text-indigo-300">Rezept Details</h3>
+                <button id="recipePopupCloseBtn" class="text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500">
+                    <i class="fas fa-times fa-lg"></i>
+                </button>
+            </div>
+            <div id="recipePopupContentContainer" class="recipe-content-container text-gray-700 dark:text-gray-300 flex-grow">
+                 <div id="recipePopupImageContainer" class="mb-4 hidden">
+                    <img id="recipePopupImage" src="" alt="Rezeptbild" class="w-full h-auto max-h-64 object-cover rounded-lg shadow-md">
+                </div>
+                <div id="recipePopupContent">
+                    <!-- Recipe text content here -->
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button id="recipePopupSchnellbestaetigungBtn" class="hidden staff-action-main-btn bg-green-500 hover:bg-green-600 text-white">
+                    <i class="fas fa-check-double mr-2"></i>Schnellbestätigung
+                </button>
+                <button id="recipePopupCloseBtnBottom" class="px-5 py-2.5 rounded-md bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
+    </script>
+
+    <script type="module">
+        // Firebase SDK imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getDatabase, ref, onValue, set, get, child, remove, push, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+        // --- Firebase Config (directly in the file) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAVEM6X3OEUuCDBrpShe02Rnq8p13oEf4s",
+            authDomain: "bar-organizer-f3784.firebaseapp.com",
+            databaseURL: "https://bar-organizer-f3784-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "bar-organizer-f3784",
+            storageBucket: "bar-organizer-f3784.appspot.com", // Corrected storageBucket format
+            messagingSenderId: "908059088110",
+            appId: "1:908059088110:web:03b861013c137ef1e2cfff",
+            measurementId: "G-M99V8FNP35"
+        };
+        
+        // --- Firebase Variables ---
+        let app;
+        let database;
+        let dbRef; 
+        const dataPath = 'barOrganizerData'; 
+
+        // --- Global State Variables ---
+        let allCategories = {};
+        let allDrinks = {};
+        let currentFilterType = "Alles";
+        let currentSearchQuery = "";
+        let selectedCategoryId = null;
+        let defaultCategoryIdGlobal = null;
+        let editModeActive = false;
+        let staffModeActive = false;
+        let initialLoadComplete = false;
+        let lastSelectedSourceCategoryIdForExistingDrink = null;
+        let sortableInstance = null;
+        
+        // --- UI Element References ---
+        const categoriesContainer = document.getElementById('categoriesContainer');
+        const drinksContainer = document.getElementById('drinksContainer');
+        const searchInput = document.getElementById('searchInput');
+        const searchInputMobile = document.getElementById('searchInputMobile');
+        const addCategoryButton = document.getElementById('addCategoryButton');
+        const addDrinkButton = document.getElementById('addDrinkButton');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const noDrinksMessage = document.getElementById('noDrinksMessage');
+        const noCategoriesMessage = document.getElementById('noCategoriesMessage');
+        const categoryTitle = document.getElementById('categoryTitle');
+        const staffAddExistingDrinkMainBtn = document.getElementById('staffAddExistingDrinkMainBtn');
+        const staffAddNewRecipeMainBtn = document.getElementById('staffAddNewRecipeMainBtn');
+        const staffPurgeCategoryBtn = document.getElementById('staffPurgeCategoryBtn');
+        const editModeCloneDrinkBtn = document.getElementById('editModeCloneDrinkBtn');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOpenBtn = document.getElementById('sidebarOpenBtn');
+        const sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const mainArea = document.getElementById('mainArea');
+        const settingsButton = document.getElementById('settingsButton');
+        const settingsModal = document.getElementById('settingsModal');
+        const closeSettingsModalButton = document.getElementById('closeSettingsModal');
+        const themeOptionButtons = document.querySelectorAll('.theme-option-button');
+        const modalEditModeButton = document.getElementById('modalEditModeButton');
+        const modalEditModeStatusText = document.getElementById('modalEditModeStatusText');
+        const modalStaffModeButton = document.getElementById('modalStaffModeButton');
+        const modalStaffModeStatusText = document.getElementById('modalStaffModeStatusText');
+        const headerModeStatus = document.getElementById('headerModeStatus');
+        const accessKeyModal = document.getElementById('accessKeyModal');
+        const accessKeyInput = document.getElementById('accessKeyInput');
+        const accessKeyError = document.getElementById('accessKeyError');
+        const staffAccessKeyModal = document.getElementById('staffAccessKeyModal');
+        const staffAccessKeyInput = document.getElementById('staffAccessKeyInput');
+        const staffAccessKeyError = document.getElementById('staffAccessKeyError');
+        const drinkModal = document.getElementById('drinkModal');
+        const drinkForm = document.getElementById('drinkForm');
+        const drinkModalTitle = document.getElementById('drinkModalTitle');
+        const drinkIdInput = document.getElementById('drinkId');
+        const drinkCategorySelect = document.getElementById('drinkCategory');
+        const drinkModalTargetCategoryIdInput = document.getElementById('drinkModalTargetCategoryId');
+        const categoryModal = document.getElementById('categoryModal');
+        const categoryForm = document.getElementById('categoryForm');
+        const categoryModalTitle = document.getElementById('categoryModalTitle');
+        const categoryIdInput = document.getElementById('categoryId');
+        const categoryStaffSettingsOuterContainer = document.getElementById('categoryStaffSettingsOuterContainer');
+        const categoryEnableStaffAddDrinkCheckbox = document.getElementById('categoryEnableStaffAddDrink');
+        const categoryEnableStaffAddRezeptCheckbox = document.getElementById('categoryEnableStaffAddRezept');
+        const categoryEnableStaffDeleteDrinkCheckbox = document.getElementById('categoryEnableStaffDeleteDrink');
+        const categoryEnableStaffPurgeFolderCheckbox = document.getElementById('categoryEnableStaffPurgeFolder');
+        const categoryEnableStaffQuickConfirmCheckbox = document.getElementById('categoryEnableStaffQuickConfirm');
+        const quickConfirmTargetFolderContainer = document.getElementById('quickConfirmTargetFolderContainer');
+        const categoryQuickConfirmTargetFolderSelect = document.getElementById('categoryQuickConfirmTargetFolder');
+        const categoryEnableRecipePopupCheckbox = document.getElementById('categoryEnableRecipePopup');
+        const addExistingDrinkModal = document.getElementById('addExistingDrinkModal');
+        const addExistingDrinkTargetCategoryIdInput = document.getElementById('addExistingDrinkTargetCategoryId');
+        const sourceCategorySelect = document.getElementById('sourceCategorySelect');
+        const sourceDrinkSearchInput = document.getElementById('sourceDrinkSearch');
+        const sourceDrinksListContainer = document.getElementById('sourceDrinksListContainer');
+        const confirmModal = document.getElementById('confirmModal');
+        const confirmModalText = document.getElementById('confirmModalText');
+        let confirmCallback = null;
+        const customAlertModal = document.getElementById('customAlertModal');
+        const customAlertText = document.getElementById('customAlertText');
+        const customAlertCloseBtn = document.getElementById('customAlertCloseBtn');
+        const recipePopupModal = document.getElementById('recipePopupModal');
+        const recipePopupTitle = document.getElementById('recipePopupTitle');
+        const recipePopupContent = document.getElementById('recipePopupContent');
+        const recipePopupImageContainer = document.getElementById('recipePopupImageContainer');
+        const recipePopupImage = document.getElementById('recipePopupImage');
+        const recipePopupCloseBtn = document.getElementById('recipePopupCloseBtn');
+        const recipePopupCloseBtnBottom = document.getElementById('recipePopupCloseBtnBottom');
+        const recipePopupSchnellbestaetigungBtn = document.getElementById('recipePopupSchnellbestaetigungBtn');
+        let currentRecipePopupDrinkId = null;
+
+        // --- Custom Alert Modal Helper ---
+        function showCustomAlert(message) {
+            customAlertText.textContent = message;
+            customAlertModal.classList.remove('hidden');
+        }
+        customAlertCloseBtn.addEventListener('click', () => customAlertModal.classList.add('hidden'));
+        customAlertModal.addEventListener('click', (e) => {
+            if (e.target === customAlertModal) customAlertModal.classList.add('hidden');
+        });
+        
+        // --- Firebase Initialization (Static Config) ---
+        function initializeFirebase() {
+            try {
+                app = initializeApp(firebaseConfig);
+                database = getDatabase(app);
+                dbRef = ref(database);
+                console.log("Firebase initialized successfully with static config.");
+                return true; 
+            } catch (error) {
+                console.error('Failed to initialize Firebase:', error);
+                showCustomAlert(`Fehler beim Initialisieren von Firebase: ${error.message}. Die App kann nicht gestartet werden.`);
+                loadingIndicator.classList.add('hidden');
+                noCategoriesMessage.classList.remove('hidden');
+                noCategoriesMessage.textContent = "Firebase Initialisierungsfehler.";
+                return false;
+            }
+        }
+
+        // --- Sidebar Logic ---
+        function toggleSidebar() {
+            sidebar.classList.toggle('-translate-x-full');
+            const isMobile = window.innerWidth < 768;
+            const isSidebarOpen = !sidebar.classList.contains('-translate-x-full');
+            if (isMobile) {
+                sidebarOverlay.classList.toggle('hidden', !isSidebarOpen);
+                mainArea.classList.remove('md:ml-64');
+            } else {
+                sidebarOverlay.classList.add('hidden');
+                mainArea.classList.toggle('md:ml-64', isSidebarOpen);
+            }
+        }
+        sidebarOpenBtn.addEventListener('click', toggleSidebar);
+        sidebarCloseBtn.addEventListener('click', toggleSidebar);
+        sidebarOverlay.addEventListener('click', toggleSidebar);
+        function initializeSidebarState() {
+            const isMobile = window.innerWidth < 768;
+            if (isMobile) {
+                sidebar.classList.add('-translate-x-full');
+                mainArea.classList.remove('md:ml-64');
+                sidebarOverlay.classList.add('hidden');
+            } else {
+                sidebar.classList.remove('-translate-x-full');
+                mainArea.classList.add('md:ml-64');
+                sidebarOverlay.classList.add('hidden');
+            }
+        }
+        window.addEventListener('resize', initializeSidebarState);
+
+        // --- Theme Switcher Logic ---
+        function applyTheme(themeToApply) {
+            const htmlEl = document.documentElement;
+            let finalTheme = themeToApply;
+            if (themeToApply === 'system') {
+                finalTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            htmlEl.classList.toggle('dark', finalTheme === 'dark');
+            localStorage.setItem('theme', themeToApply);
+            updateThemeButtonsState(themeToApply);
+            const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+            if (themeColorMeta) {
+                themeColorMeta.setAttribute('content', finalTheme === 'dark' ? '#1f2937' : '#4f46e5');
+            }
+        }
+        function updateThemeButtonsState(activeThemeChoice) {
+            themeOptionButtons.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.themeValue === activeThemeChoice);
+            });
+        }
+        themeOptionButtons.forEach(button => {
+            button.addEventListener('click', () => applyTheme(button.dataset.themeValue));
+        });
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            if (localStorage.getItem('theme') === 'system') {
+                applyTheme('system');
+            }
+        });
+
+        // --- Settings Modal Logic ---
+        settingsButton.addEventListener('click', () => settingsModal.classList.remove('hidden'));
+        closeSettingsModalButton.addEventListener('click', () => settingsModal.classList.add('hidden'));
+        settingsModal.addEventListener('click', (e) => {
+            if (e.target === settingsModal) settingsModal.classList.add('hidden');
+        });
+
+        // --- Initial Data Setup and Migration ---
+        async function initializeDefaultData() {
+            if (!dbRef) { 
+                console.error("initializeDefaultData: dbRef is not initialized.");
+                return;
+            }
+            const snapshot = await get(child(dbRef, dataPath));
+            const data = snapshot.val();
+            let initialSetupNeeded = !data;
+            let updates = {};
+            const defaultStaffSettings = {
+                allowAddExisting: true, allowAddNewRecipe: true, darfDrinksLoeschen: true, darfOrdnerLeeren: false,
+                darfSchnellbestaetigung: false, schnellbestaetigungZielordnerId: null, enableRecipePopup: true
+            };
+            if (initialSetupNeeded) {
+                console.log("Database appears empty. Initializing default data...");
+                updates = {
+                    Key: "geheim123", Key2: "personal456",
+                    appSettings: { defaultCategoryId: "cat_default" },
+                    categories: { "cat_default": { name: "Erste Bar", staffSettings: { ...defaultStaffSettings }, order: 0 } },
+                    drinks: {
+                        "drink_default_mojito": {
+                            name: "Mojito Classic", type: "Cocktail", categoryId: "cat_default",
+                            ingredients: [{ item: "Weißer Rum", amount: "5 cl" }, { item: "Limettensaft", amount: "2.5 cl" }, { item: "Zuckersirup", amount: "2 cl" }, { item: "Minzblätter", amount: "8-10" }, {item: "Sodawasser", amount: "Auffüllen"}],
+                            recipe: "Minzblätter mit Zucker und Limettensaft im Glas leicht andrücken. Glas mit Crushed Ice füllen, Rum dazugeben und mit Sodawasser auffüllen. Vorsichtig umrühren.", symbols: "🌿🍹",
+                            imageUrl: "https://images.unsplash.com/photo-1604329357989-b31917511c13?q=80&w=1935&auto=format&fit=crop"
+                        }
+                    }
+                };
+                await set(child(dbRef, dataPath), updates);
+                console.log("Default data initialized.");
+                return;
+            }
+            // Migration checks
+            if (typeof data.Key === 'undefined') updates.Key = "geheim123";
+            if (typeof data.Key2 === 'undefined') updates.Key2 = "personal456";
+            if (!data.appSettings || typeof data.appSettings.defaultCategoryId === 'undefined') {
+                 const firstCatId = data.categories ? Object.keys(data.categories)[0] : null;
+                 updates['appSettings/defaultCategoryId'] = firstCatId || "cat_placeholder_default";
+            }
+            if (data.categories) {
+                let orderIndex = 0;
+                Object.entries(data.categories).forEach(([catId, category]) => {
+                    let currentSettings = category.staffSettings || {};
+                    let needsUpdate = false;
+                    for (const keyInDefault in defaultStaffSettings) {
+                        if (typeof currentSettings[keyInDefault] === 'undefined') {
+                            currentSettings[keyInDefault] = defaultStaffSettings[keyInDefault];
+                            needsUpdate = true;
+                        }
+                    }
+                    if (needsUpdate) {
+                        updates[`categories/${catId}/staffSettings`] = currentSettings;
+                    }
+                    // Add order property if missing
+                    if (typeof category.order === 'undefined') {
+                        updates[`categories/${catId}/order`] = orderIndex++;
+                    }
+                });
+            } else {
+                 updates['categories/cat_initial_fallback'] = { name: "Meine Bar", staffSettings: { ...defaultStaffSettings }, order: 0 };
+                 if ((updates['appSettings/defaultCategoryId'] === "cat_placeholder_default" || !data.appSettings?.defaultCategoryId) && !data.categories) {
+                    updates['appSettings/defaultCategoryId'] = 'cat_initial_fallback';
+                 }
+            }
+            if (Object.keys(updates).length > 0) {
+                await update(child(dbRef, dataPath), updates);
+                console.log("Data structure updated/migrated:", updates);
+            }
+        }
+
+        // --- Firebase Data Listener ---
+        function loadData() {
+            if (!dbRef) {
+                console.error("loadData: dbRef is not initialized.");
+                loadingIndicator.classList.add('hidden');
+                noCategoriesMessage.classList.remove('hidden');
+                noCategoriesMessage.textContent = "Datenbankverbindung nicht bereit.";
+                return;
+            }
+            noCategoriesMessage.classList.add('hidden');
+            onValue(child(dbRef, dataPath), async (snapshot) => {
+                const data = snapshot.val();
+                loadingIndicator.classList.add('hidden');
+                if (!data || !data.categories || Object.keys(data.categories).length === 0) {
+                    allCategories = {}; allDrinks = {}; defaultCategoryIdGlobal = null; selectedCategoryId = null;
+                    noCategoriesMessage.classList.remove('hidden');
+                    drinksContainer.innerHTML = '';
+                    noDrinksMessage.classList.add('hidden');
+                    categoryTitle.textContent = "Keine Ordner";
+                    renderCategories();
+                    updateMainActionButtonsVisibility();
+                    initialLoadComplete = true;
+                    return;
+                }
+                noCategoriesMessage.classList.add('hidden');
+                allCategories = data.categories || {};
+                allDrinks = data.drinks || {};
+                const newDefaultCategoryIdFromDB = data.appSettings?.defaultCategoryId || null;
+                const defaultStaffSettingsFull = {
+                    allowAddExisting: true, allowAddNewRecipe: true, darfDrinksLoeschen: true, darfOrdnerLeeren: false,
+                    darfSchnellbestaetigung: false, schnellbestaetigungZielordnerId: null, enableRecipePopup: true
+                };
+                Object.values(allCategories).forEach(cat => {
+                    cat.staffSettings = { ...defaultStaffSettingsFull, ...cat.staffSettings };
+                });
+                if (!initialLoadComplete) {
+                    defaultCategoryIdGlobal = newDefaultCategoryIdFromDB;
+                    if (defaultCategoryIdGlobal && allCategories[defaultCategoryIdGlobal]) {
+                        selectedCategoryId = defaultCategoryIdGlobal;
+                    } else if (Object.keys(allCategories).length > 0) {
+                        selectedCategoryId = Object.keys(allCategories)[0];
+                        if (!defaultCategoryIdGlobal || !allCategories[defaultCategoryIdGlobal]) {
+                           console.warn(`Initial defaultCategoryId from DB ('${newDefaultCategoryIdFromDB}') was invalid or not found. Selected first available category ('${selectedCategoryId}'). Consider setting a valid default in edit mode.`);
+                        }
+                    } else {
+                        selectedCategoryId = null;
+                    }
+                    initialLoadComplete = true;
+                } else {
+                    defaultCategoryIdGlobal = newDefaultCategoryIdFromDB;
+                    if (!selectedCategoryId || (selectedCategoryId && !allCategories[selectedCategoryId])) {
+                        if (defaultCategoryIdGlobal && allCategories[defaultCategoryIdGlobal]) {
+                            selectedCategoryId = defaultCategoryIdGlobal;
+                        } else if (Object.keys(allCategories).length > 0) {
+                            selectedCategoryId = Object.keys(allCategories)[0];
+                        } else {
+                            selectedCategoryId = null;
+                        }
+                    }
+                }
+                renderCategories();
+                populateCategorySelectInForms();
+                filterAndRenderDrinks();
+            }, (error) => {
+                console.error("Firebase data listener error:", error);
+                showCustomAlert("Fehler beim Laden der Daten. Prüfe die Internetverbindung und versuche es später erneut.");
+                loadingIndicator.classList.add('hidden');
+                noCategoriesMessage.classList.remove('hidden');
+                noCategoriesMessage.textContent = "Fehler beim Laden der Daten.";
+                allCategories = {}; allDrinks = {};
+                renderCategories(); filterAndRenderDrinks();
+                initialLoadComplete = true;
+            });
+        }
+
+        // --- Rendering & Sorting Functions ---
+        function renderCategories() {
+            if (sortableInstance) {
+                sortableInstance.destroy();
+                sortableInstance = null;
+            }
+            categoriesContainer.innerHTML = '';
+            if (Object.keys(allCategories).length === 0) {
+                const placeholder = document.createElement('p');
+                placeholder.className = 'text-sm text-gray-500 dark:text-gray-400 px-2';
+                placeholder.textContent = editModeActive ? "Klicke unten auf '+ Ordner', um einen neuen Ordner zu erstellen." : "Keine Ordner vorhanden.";
+                categoriesContainer.appendChild(placeholder);
+                updateAddCategoryButtonVisibility();
+                updateMainActionButtonsVisibility();
+                return;
+            }
+            const sortedCategories = Object.entries(allCategories).sort(([,a],[,b]) => (a.order || 0) - (b.order || 0));
+            sortedCategories.forEach(([id, category]) => {
+                const isActive = id === selectedCategoryId;
+                const isHome = id === defaultCategoryIdGlobal;
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = `p-2.5 mb-1.5 rounded-lg cursor-pointer hover:bg-indigo-100 dark:hover:bg-gray-700 transition-colors duration-150 ease-in-out flex flex-col text-sm ${isActive ? 'category-active bg-indigo-600 dark:bg-indigo-500 text-white' : 'bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300'}`;
+                categoryDiv.dataset.id = id;
+
+                let editButtonsHtml = '';
+                if (editModeActive) {
+                    const homeIconClass = isHome ? 'fas fa-star home-folder-icon is-home' : 'far fa-star home-folder-icon';
+                    editButtonsHtml = `
+                        <button data-id="${id}" title="Als Startordner festlegen" class="set-home-category-btn text-yellow-400 hover:text-yellow-500 p-1"><i class="${homeIconClass}"></i></button>
+                        <button data-id="${id}" title="Ordner bearbeiten" class="edit-category-btn text-yellow-500 dark:text-yellow-400 hover:text-yellow-400 dark:hover:text-yellow-300 p-1"><i class="fas fa-edit"></i></button>
+                        ${Object.keys(allCategories).length > 1 ? `<button data-id="${id}" title="Ordner löschen" class="delete-category-btn text-red-500 dark:text-red-400 hover:text-red-400 dark:hover:text-red-300 p-1"><i class="fas fa-trash"></i></button>` : ''}
+                    `;
+                }
+                 const dragHandleHtml = editModeActive ? `<span class="drag-handle text-gray-400 dark:text-gray-500 pr-2"><i class="fas fa-grip-vertical"></i></span>` : '';
+
+                categoryDiv.innerHTML = `
+                    <div class="flex justify-between items-center w-full">
+                        <div class="flex items-center flex-grow min-w-0">
+                             ${dragHandleHtml}
+                            <span class="font-medium truncate pr-2">${category.name}</span>
+                        </div>
+                        ${editModeActive ? `<div class="space-x-0.5 flex-shrink-0">${editButtonsHtml}</div>` : ''}
+                    </div>
+                `;
+                categoryDiv.addEventListener('click', (e) => {
+                    if (e.target.closest('.edit-category-btn, .delete-category-btn, .set-home-category-btn, .drag-handle')) return;
+                    if (selectedCategoryId !== id) {
+                        selectedCategoryId = id;
+                        renderCategories();
+                        filterAndRenderDrinks();
+                    }
+                    if (window.innerWidth < 768) toggleSidebar();
+                });
+                categoriesContainer.appendChild(categoryDiv);
+            });
+            document.querySelectorAll('.edit-category-btn').forEach(btn => btn.addEventListener('click', (e) => {e.stopPropagation(); handleEditCategory(btn.dataset.id);}));
+            document.querySelectorAll('.delete-category-btn').forEach(btn => btn.addEventListener('click', (e) => {e.stopPropagation(); handleDeleteCategory(btn.dataset.id);}));
+            document.querySelectorAll('.set-home-category-btn').forEach(btn => btn.addEventListener('click', (e) => {e.stopPropagation(); setDefaultCategory(btn.dataset.id);}));
+            
+            if (editModeActive) {
+                setupCategoryReordering();
+            }
+            updateAddCategoryButtonVisibility();
+            updateMainActionButtonsVisibility();
+        }
+
+        function setupCategoryReordering() {
+             if (sortableInstance) sortableInstance.destroy();
+             sortableInstance = new Sortable(categoriesContainer, {
+                animation: 150,
+                handle: '.drag-handle', 
+                ghostClass: 'sortable-ghost',
+                onEnd: async function (evt) {
+                    const categoryElements = [...categoriesContainer.children];
+                    const updates = {};
+                    categoryElements.forEach((el, index) => {
+                        const categoryId = el.dataset.id;
+                        if (categoryId) {
+                           updates[`${dataPath}/categories/${categoryId}/order`] = index;
+                        }
+                    });
+                    
+                    try {
+                        await update(dbRef, updates);
+                        console.log("Folder order updated in Firebase.");
+                    } catch (error) {
+                        console.error("Error updating folder order:", error);
+                        showCustomAlert("Fehler beim Aktualisieren der Ordnerreihenfolge.");
+                        // Re-render to revert visual change
+                        renderCategories();
+                    }
+                },
+            });
+        }
+        
+        function updateAddCategoryButtonVisibility() { addCategoryButton.classList.toggle('hidden', !editModeActive); }
+
+        function filterAndRenderDrinks() {
+            if (!selectedCategoryId || !allCategories[selectedCategoryId]) {
+                categoryTitle.textContent = "Ordner wählen";
+                drinksContainer.innerHTML = '';
+                noDrinksMessage.classList.remove('hidden');
+                noDrinksMessage.textContent = "Bitte wähle einen Ordner aus der Seitenleiste.";
+                if (Object.keys(allCategories).length === 0) noDrinksMessage.classList.add('hidden');
+                updateMainActionButtonsVisibility();
+                return;
+            }
+            const currentCategory = allCategories[selectedCategoryId];
+            const currentCategoryName = currentCategory?.name || "Ausgewählter Ordner";
+            categoryTitle.textContent = currentCategoryName;
+            drinksContainer.innerHTML = '';
+            noDrinksMessage.classList.add('hidden');
+            const searchTerms = currentSearchQuery.split(',').map(term => term.trim().toLowerCase()).filter(term => term.length > 0);
+            const drinksToDisplay = Object.entries(allDrinks).filter(([id, drink]) => {
+                const matchesCategory = drink.categoryId === selectedCategoryId;
+                const matchesType = currentFilterType === "Alles" || drink.type === currentFilterType;
+                let matchesSearch = true;
+                if (searchTerms.length > 0) {
+                    matchesSearch = searchTerms.every(term => {
+                        const nameMatchesTerm = drink.name.toLowerCase().includes(term);
+                        const ingredientItems = (drink.ingredients || []).map(ing => ing.item.toLowerCase());
+                        const ingredientMatchesTerm = ingredientItems.some(ingItem => ingItem.includes(term));
+                        return nameMatchesTerm || ingredientMatchesTerm;
+                    });
+                }
+                return matchesCategory && matchesType && matchesSearch;
+            });
+            if (drinksToDisplay.length === 0) {
+                noDrinksMessage.classList.remove('hidden');
+                noDrinksMessage.textContent = `Keine Drinks in "${currentCategoryName}" gefunden${currentSearchQuery ? ` für "${currentSearchQuery.split(',').join(', ')}"` : ''}.`;
+                 if (Object.keys(allCategories).length === 0) noDrinksMessage.classList.add('hidden');
+            }
+            drinksToDisplay.sort(([,a],[,b]) => a.name.localeCompare(b.name));
+            drinksToDisplay.forEach(([id, drink]) => {
+                const drinkCard = document.createElement('div');
+                drinkCard.className = 'bg-white dark:bg-gray-800 p-5 rounded-xl shadow-lg hover:shadow-xl drink-card';
+                drinkCard.dataset.drinkId = id;
+                let actionButtonsHtml = '';
+                const staffSettings = currentCategory?.staffSettings;
+                if (editModeActive) {
+                    actionButtonsHtml = `
+                        <button data-id="${id}" class="edit-drink-btn text-yellow-600 dark:text-yellow-400 hover:text-yellow-500 dark:hover:text-yellow-300 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-xs"><i class="fas fa-edit mr-1"></i> Bearbeiten</button>
+                        <button data-id="${id}" class="delete-drink-btn text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-xs"><i class="fas fa-trash mr-1"></i> Löschen</button>
+                    `;
+                } else if (staffModeActive) {
+                    let staffButtons = '';
+                    if (staffSettings?.darfDrinksLoeschen) {
+                         staffButtons += `<button data-id="${id}" class="delete-drink-btn text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 px-3 py-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-xs"><i class="fas fa-trash mr-1"></i> Löschen</button>`;
+                    }
+                    if (staffSettings?.darfSchnellbestaetigung && staffSettings.schnellbestaetigungZielordnerId && staffSettings.schnellbestaetigungZielordnerId !== drink.categoryId && allCategories[staffSettings.schnellbestaetigungZielordnerId]) {
+                        staffButtons += `<button data-id="${id}" data-drink-name="${drink.name}" class="quick-confirm-btn ml-2 text-green-600 dark:text-green-400 hover:text-green-500 dark:hover:text-green-300 px-2 py-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-xs" title="Schnellbestätigen nach ${allCategories[staffSettings.schnellbestaetigungZielordnerId]?.name || 'Zielordner'}"><i class="fas fa-check-double"></i></button>`;
+                    }
+                    if(staffButtons) actionButtonsHtml = staffButtons;
+                }
+                drinkCard.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <h3 class="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">${drink.name} <span class="text-lg">${drink.symbols || ''}</span></h3>
+                        <span class="text-xs sm:text-sm px-3 py-1 rounded-full font-semibold ${drink.type === 'Mocktail' ? 'bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100' : 'bg-red-100 text-red-700 dark:bg-red-700 dark:text-red-100'}">${drink.type}</span>
+                    </div>
+                    <div class="mb-3">
+                        <h4 class="font-semibold text-indigo-500 dark:text-indigo-300 mb-1 text-sm">Zutaten:</h4>
+                        <ul class="list-disc list-inside text-gray-600 dark:text-gray-300 space-y-0.5 text-sm">
+                            ${(drink.ingredients || []).map(ing => `<li>${ing.amount} ${ing.item}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <div class="mb-1">
+                        <h4 class="font-semibold text-indigo-500 dark:text-indigo-300 mb-1 text-sm">Rezept:</h4>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm whitespace-pre-wrap">${drink.recipe}</p>
+                    </div>
+                    ${actionButtonsHtml ? `<div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-2">${actionButtonsHtml}</div>` : ''}
+                `;
+                drinksContainer.appendChild(drinkCard);
+                drinkCard.addEventListener('dblclick', handleDrinkCardDoubleClick);
+                let lastCardTap = 0;
+                drinkCard.addEventListener('touchend', (event) => {
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - lastCardTap;
+                    if (tapLength < 300 && tapLength > 0) {
+                        event.preventDefault();
+                        handleDrinkCardDoubleClick(event);
+                    }
+                    lastCardTap = currentTime;
+                });
+            });
+            document.querySelectorAll('.edit-drink-btn').forEach(btn => btn.addEventListener('click', () => handleEditDrink(btn.dataset.id)));
+            document.querySelectorAll('.delete-drink-btn').forEach(btn => btn.addEventListener('click', () => handleDeleteDrink(btn.dataset.id)));
+            document.querySelectorAll('.quick-confirm-btn').forEach(btn => btn.addEventListener('click', () => handleQuickConfirmDrink(btn.dataset.id, btn.dataset.drinkName)));
+            updateMainActionButtonsVisibility();
+        }
+        function handleDrinkCardDoubleClick(event) {
+            const card = event.currentTarget.closest('.drink-card');
+            if (!card) return;
+            const drinkId = card.dataset.drinkId;
+            if (!drinkId || !allDrinks[drinkId] || !allCategories[allDrinks[drinkId].categoryId]) return;
+            const categorySettings = allCategories[allDrinks[drinkId].categoryId].staffSettings;
+            if ((categorySettings && categorySettings.enableRecipePopup !== undefined ? categorySettings.enableRecipePopup : true)) {
+                showRecipePopup(drinkId);
+            }
+        }
+
+        // --- Edit/Staff Mode Activation & UI ---
+        modalEditModeButton.addEventListener('click', () => {
+            if (editModeActive) { editModeActive = false; updateActiveModesUI(); }
+            else {
+                if(staffModeActive) { showCustomAlert("Bitte zuerst den Personal Modus verlassen."); return; }
+                settingsModal.classList.add('hidden'); accessKeyInput.value = ''; accessKeyError.textContent = '';
+                accessKeyModal.classList.remove('hidden');
+            }
+        });
+        document.getElementById('accessKeySubmit').addEventListener('click', async () => {
+            if (!dbRef) { accessKeyError.textContent = 'Datenbank nicht bereit.'; return; } 
+            const keyAttempt = accessKeyInput.value;
+            const dbKeySnapshot = await get(child(dbRef, `${dataPath}/Key`));
+            const correctKey = dbKeySnapshot.val();
+            if (keyAttempt === correctKey) {
+                editModeActive = true; updateActiveModesUI(); accessKeyModal.classList.add('hidden');
+                if (initialLoadComplete && (!defaultCategoryIdGlobal || !allCategories[defaultCategoryIdGlobal]) && Object.keys(allCategories).length > 0) {
+                    const firstCatId = Object.keys(allCategories)[0];
+                    await setDefaultCategory(firstCatId);
+                }
+            } else { accessKeyError.textContent = 'Ungültiger Schlüssel.'; }
+        });
+        document.getElementById('accessKeyCancel').addEventListener('click', () => accessKeyModal.classList.add('hidden'));
+        modalStaffModeButton.addEventListener('click', () => {
+            if (staffModeActive) { staffModeActive = false; updateActiveModesUI(); }
+            else {
+                if(editModeActive) { showCustomAlert("Bitte zuerst den Bearbeitungsmodus verlassen."); return; }
+                settingsModal.classList.add('hidden'); staffAccessKeyInput.value = ''; staffAccessKeyError.textContent = '';
+                staffAccessKeyModal.classList.remove('hidden');
+            }
+        });
+        document.getElementById('staffAccessKeySubmit').addEventListener('click', async () => {
+            if (!dbRef) { staffAccessKeyError.textContent = 'Datenbank nicht bereit.'; return; }
+            const keyAttempt = staffAccessKeyInput.value;
+            const dbKeySnapshot = await get(child(dbRef, `${dataPath}/Key2`));
+            const correctKey = dbKeySnapshot.val();
+            if (keyAttempt === correctKey) {
+                staffModeActive = true; updateActiveModesUI(); staffAccessKeyModal.classList.add('hidden');
+            } else { staffAccessKeyError.textContent = 'Ungültiger Personal Schlüssel.'; }
+        });
+        document.getElementById('staffAccessKeyCancel').addEventListener('click', () => staffAccessKeyModal.classList.add('hidden'));
+        
+        function updateMainActionButtonsVisibility() {
+            const catExists = selectedCategoryId && allCategories[selectedCategoryId];
+            const currentCategorySettings = catExists ? allCategories[selectedCategoryId].staffSettings : null;
+            staffAddExistingDrinkMainBtn.classList.toggle('hidden', !(staffModeActive && catExists && currentCategorySettings?.allowAddExisting));
+            staffAddNewRecipeMainBtn.classList.toggle('hidden', !(staffModeActive && catExists && currentCategorySettings?.allowAddNewRecipe));
+            staffPurgeCategoryBtn.classList.toggle('hidden', !(staffModeActive && catExists && currentCategorySettings?.darfOrdnerLeeren));
+            const showEditModeAddDrinkButton = editModeActive && catExists && !staffModeActive;
+            addDrinkButton.classList.toggle('hidden', !showEditModeAddDrinkButton);
+            const showEditModeCloneDrinkButton = editModeActive && catExists && !staffModeActive;
+            editModeCloneDrinkBtn.classList.toggle('hidden', !showEditModeCloneDrinkButton);
+        }
+        function updateActiveModesUI() {
+            if (editModeActive) {
+                modalEditModeButton.innerHTML = '<i class="fas fa-lock-open mr-2"></i> Bearbeitungsmodus Verlassen';
+                modalEditModeButton.classList.remove('bg-green-500', 'hover:bg-green-600', 'focus:ring-green-400');
+                modalEditModeButton.classList.add('bg-red-500', 'hover:bg-red-600', 'focus:ring-red-400');
+                modalEditModeStatusText.textContent = 'Aktiv';
+                modalEditModeStatusText.className = 'font-semibold text-green-600 dark:text-green-400';
+                headerModeStatus.textContent = 'Bearbeitungsmodus Aktiv';
+                headerModeStatus.classList.remove('hidden', 'bg-purple-400', 'dark:bg-purple-500', 'text-purple-800', 'dark:text-gray-900');
+                headerModeStatus.classList.add('bg-yellow-400', 'text-yellow-800', 'dark:bg-yellow-500', 'dark:text-gray-900');
+            } else {
+                modalEditModeButton.innerHTML = '<i class="fas fa-lock mr-2"></i> Bearbeitungsmodus Aktivieren';
+                modalEditModeButton.classList.remove('bg-red-500', 'hover:bg-red-600', 'focus:ring-red-400');
+                modalEditModeButton.classList.add('bg-green-500', 'hover:bg-green-600', 'focus:ring-green-400');
+                modalEditModeStatusText.textContent = 'Inaktiv';
+                modalEditModeStatusText.className = 'font-semibold text-red-600 dark:text-red-400';
+            }
+            updateAddCategoryButtonVisibility();
+            if (staffModeActive) {
+                modalStaffModeButton.innerHTML = '<i class="fas fa-user-shield mr-2"></i> Personal Modus Verlassen';
+                modalStaffModeButton.classList.remove('bg-purple-500', 'hover:bg-purple-600', 'focus:ring-purple-400');
+                modalStaffModeButton.classList.add('bg-red-500', 'hover:bg-red-600', 'focus:ring-red-400');
+                modalStaffModeStatusText.textContent = 'Aktiv';
+                modalStaffModeStatusText.className = 'font-semibold text-green-600 dark:text-green-400';
+                headerModeStatus.textContent = 'Personal Modus Aktiv';
+                headerModeStatus.classList.remove('hidden', 'bg-yellow-400', 'dark:bg-yellow-500', 'text-yellow-800', 'dark:text-gray-900');
+                headerModeStatus.classList.add('bg-purple-400', 'text-purple-800', 'dark:bg-purple-500', 'dark:text-gray-900');
+            } else {
+                modalStaffModeButton.innerHTML = '<i class="fas fa-user-cog mr-2"></i> Personal Modus Aktivieren';
+                modalStaffModeButton.classList.remove('bg-red-500', 'hover:bg-red-600', 'focus:ring-red-400');
+                modalStaffModeButton.classList.add('bg-purple-500', 'hover:bg-purple-600', 'focus:ring-purple-400');
+                modalStaffModeStatusText.textContent = 'Inaktiv';
+                modalStaffModeStatusText.className = 'font-semibold text-red-600 dark:text-red-400';
+            }
+            if (!editModeActive && !staffModeActive) {
+                headerModeStatus.textContent = 'Ansichtsmodus';
+                headerModeStatus.classList.add('hidden');
+                headerModeStatus.classList.remove('bg-yellow-400', 'text-yellow-800', 'dark:bg-yellow-500', 'dark:text-gray-900', 'bg-purple-400', 'dark:bg-purple-500', 'text-purple-800');
+            } else { headerModeStatus.classList.remove('hidden'); }
+            
+            // Re-render categories to show/hide drag handles and edit buttons
+            renderCategories(); 
+            filterAndRenderDrinks(); 
+            updateMainActionButtonsVisibility();
+        }
+
+        // --- Search and Filter Logic ---
+        function handleSearchInput(e) {
+            currentSearchQuery = e.target.value;
+            if (e.target.id === 'searchInput' && searchInputMobile) searchInputMobile.value = currentSearchQuery;
+            if (e.target.id === 'searchInputMobile' && searchInput) searchInput.value = currentSearchQuery;
+            filterAndRenderDrinks();
+        }
+        if (searchInput) searchInput.addEventListener('input', handleSearchInput);
+        if (searchInputMobile) searchInputMobile.addEventListener('input', handleSearchInput);
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => {
+                    b.classList.remove('bg-indigo-600', 'dark:bg-indigo-500', 'text-white', 'ring-2', 'ring-indigo-400');
+                    b.classList.add('text-gray-700', 'dark:text-gray-300', 'hover:bg-indigo-500', 'dark:hover:bg-indigo-600', 'hover:text-white');
+                });
+                btn.classList.add('bg-indigo-600', 'dark:bg-indigo-500', 'text-white', 'ring-2', 'ring-indigo-400');
+                btn.classList.remove('text-gray-700', 'dark:text-gray-300');
+                currentFilterType = btn.dataset.type;
+                filterAndRenderDrinks();
+            });
+        });
+
+        // --- Category (Folder) CRUD ---
+        addCategoryButton.addEventListener('click', () => openCategoryModal());
+        function openCategoryModal(id = null) {
+            categoryForm.reset(); categoryIdInput.value = id || '';
+            const currentEditingCategoryId = id; const category = id ? allCategories[id] : null;
+            categoryStaffSettingsOuterContainer.classList.toggle('hidden', !editModeActive);
+            quickConfirmTargetFolderContainer.classList.add('hidden');
+            categoryQuickConfirmTargetFolderSelect.innerHTML = '<option value="">-- Zielordner wählen --</option>';
+            if (category) {
+                categoryModalTitle.textContent = 'Ordner Bearbeiten';
+                document.getElementById('categoryName').value = category.name;
+                const staffSettings = category.staffSettings || {};
+                categoryEnableStaffAddDrinkCheckbox.checked = staffSettings.allowAddExisting !== undefined ? staffSettings.allowAddExisting : true;
+                categoryEnableStaffAddRezeptCheckbox.checked = staffSettings.allowAddNewRecipe !== undefined ? staffSettings.allowAddNewRecipe : true;
+                categoryEnableStaffDeleteDrinkCheckbox.checked = staffSettings.darfDrinksLoeschen !== undefined ? staffSettings.darfDrinksLoeschen : true;
+                categoryEnableStaffPurgeFolderCheckbox.checked = staffSettings.darfOrdnerLeeren !== undefined ? staffSettings.darfOrdnerLeeren : false;
+                categoryEnableStaffQuickConfirmCheckbox.checked = staffSettings.darfSchnellbestaetigung || false;
+                categoryEnableRecipePopupCheckbox.checked = staffSettings.enableRecipePopup !== undefined ? staffSettings.enableRecipePopup : true;
+                populateQuickConfirmTargetFolderSelect(currentEditingCategoryId, staffSettings.schnellbestaetigungZielordnerId);
+                if (categoryEnableStaffQuickConfirmCheckbox.checked) quickConfirmTargetFolderContainer.classList.remove('hidden');
+            } else {
+                categoryModalTitle.textContent = 'Neuen Ordner Erstellen';
+                categoryEnableStaffAddDrinkCheckbox.checked = true; categoryEnableStaffAddRezeptCheckbox.checked = true;
+                categoryEnableStaffDeleteDrinkCheckbox.checked = true; categoryEnableStaffPurgeFolderCheckbox.checked = false;
+                categoryEnableStaffQuickConfirmCheckbox.checked = false; categoryEnableRecipePopupCheckbox.checked = true;
+                populateQuickConfirmTargetFolderSelect(null, null);
+            }
+            categoryModal.classList.remove('hidden');
+        }
+        categoryEnableStaffQuickConfirmCheckbox.addEventListener('change', (e) => {
+            quickConfirmTargetFolderContainer.classList.toggle('hidden', !e.target.checked);
+            if (!e.target.checked) categoryQuickConfirmTargetFolderSelect.value = "";
+        });
+        function populateQuickConfirmTargetFolderSelect(currentEditingCatId, selectedTargetId) {
+            categoryQuickConfirmTargetFolderSelect.innerHTML = '<option value="">-- Zielordner wählen --</option>';
+            Object.entries(allCategories).forEach(([id, cat]) => {
+                if (id === currentEditingCatId) return;
+                const option = document.createElement('option');
+                option.value = id; option.textContent = cat.name;
+                if (id === selectedTargetId) option.selected = true;
+                categoryQuickConfirmTargetFolderSelect.appendChild(option);
+            });
+        }
+        categoryForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!dbRef) { showCustomAlert("Datenbank nicht bereit."); return; }
+            const id = categoryIdInput.value; const name = document.getElementById('categoryName').value.trim();
+            if (!name) { showCustomAlert("Ordnername darf nicht leer sein."); return; }
+            let staffSettings = {};
+            if (editModeActive) {
+                staffSettings = {
+                    allowAddExisting: categoryEnableStaffAddDrinkCheckbox.checked, allowAddNewRecipe: categoryEnableStaffAddRezeptCheckbox.checked,
+                    darfDrinksLoeschen: categoryEnableStaffDeleteDrinkCheckbox.checked, darfOrdnerLeeren: categoryEnableStaffPurgeFolderCheckbox.checked,
+                    darfSchnellbestaetigung: categoryEnableStaffQuickConfirmCheckbox.checked,
+                    schnellbestaetigungZielordnerId: categoryEnableStaffQuickConfirmCheckbox.checked ? categoryQuickConfirmTargetFolderSelect.value : null,
+                    enableRecipePopup: categoryEnableRecipePopupCheckbox.checked
+                };
+                if (staffSettings.darfSchnellbestaetigung && !staffSettings.schnellbestaetigungZielordnerId) {
+                    showCustomAlert("Bitte einen Zielordner für die Schnellbestätigung auswählen oder die Option deaktivieren."); return;
+                }
+            } else { staffSettings = (id && allCategories[id]) ? allCategories[id].staffSettings : { allowAddExisting: true, allowAddNewRecipe: true, darfDrinksLoeschen: true, darfOrdnerLeeren: false, darfSchnellbestaetigung: false, schnellbestaetigungZielordnerId: null, enableRecipePopup: true }; }
+            
+            try {
+                if (id) {
+                     const categoryData = { name, staffSettings };
+                     await update(child(dbRef, `${dataPath}/categories/${id}`), categoryData);
+                } else {
+                    const existingOrders = Object.values(allCategories).map(c => c.order || 0);
+                    const maxOrder = existingOrders.length > 0 ? Math.max(...existingOrders) : -1;
+                    const newOrder = maxOrder + 1;
+                    const categoryData = { name, staffSettings, order: newOrder };
+
+                    const newCategoryRef = push(child(dbRef, `${dataPath}/categories`));
+                    await set(newCategoryRef, categoryData);
+                    selectedCategoryId = newCategoryRef.key;
+                    if (Object.keys(allCategories).length === 1 && !defaultCategoryIdGlobal && editModeActive) {
+                        await setDefaultCategory(newCategoryRef.key);
+                    }
+                }
+                categoryModal.classList.add('hidden');
+            } catch (error) { console.error("Fehler beim Speichern des Ordners:", error); showCustomAlert("Fehler beim Speichern des Ordners."); }
+        });
+        document.getElementById('categoryCancel').addEventListener('click', () => categoryModal.classList.add('hidden'));
+        categoryModal.addEventListener('click', (e) => { if (e.target === categoryModal) categoryModal.classList.add('hidden'); });
+        function handleEditCategory(id) { openCategoryModal(id); }
+        async function handleDeleteCategory(id) {
+            if (!dbRef) { showCustomAlert("Datenbank nicht bereit."); return; } 
+            if (Object.keys(allCategories).length <= 1 && editModeActive) { showCustomAlert("Der letzte Ordner kann nicht gelöscht werden."); return; }
+            if (!allCategories[id]) { showCustomAlert("Ordner nicht gefunden."); return; }
+            showConfirmModal(`Sicher, dass du den Ordner "${allCategories[id].name}" löschen willst? Alle Drinks darin werden ebenfalls GELÖSCHT. Diese Aktion kann nicht rückgängig gemacht werden!`, async () => {
+                try {
+                    const updates = {};
+                    Object.entries(allDrinks).forEach(([drinkId, drink]) => { if (drink.categoryId === id) updates[`${dataPath}/drinks/${drinkId}`] = null; });
+                    updates[`${dataPath}/categories/${id}`] = null;
+                    Object.entries(allCategories).forEach(([otherCatId, otherCatData]) => {
+                        if (otherCatData.staffSettings?.schnellbestaetigungZielordnerId === id) {
+                            updates[`${dataPath}/categories/${otherCatId}/staffSettings/schnellbestaetigungZielordnerId`] = null;
+                            updates[`${dataPath}/categories/${otherCatId}/staffSettings/darfSchnellbestaetigung`] = false;
+                        }
+                    });
+                    await update(dbRef, updates);
+                    if (defaultCategoryIdGlobal === id) {
+                        const remainingCategoryIds = Object.keys(allCategories).filter(catId => catId !== id && allCategories[catId]);
+                        const newDefaultCatId = remainingCategoryIds.length > 0 ? remainingCategoryIds[0] : null;
+                        if (newDefaultCatId) await setDefaultCategory(newDefaultCatId);
+                        else { await update(child(dbRef, `${dataPath}/appSettings`), { defaultCategoryId: null }); defaultCategoryIdGlobal = null; }
+                    }
+                    if (selectedCategoryId === id) {
+                        selectedCategoryId = defaultCategoryIdGlobal;
+                        if (!selectedCategoryId && Object.keys(allCategories).filter(catId => catId !== id && allCategories[catId]).length > 0) {
+                            selectedCategoryId = Object.keys(allCategories).filter(catId => catId !== id && allCategories[catId])[0];
+                        }
+                    }
+                } catch (error) { console.error("Fehler beim Löschen des Ordners:", error); showCustomAlert("Fehler beim Löschen des Ordners."); }
+            });
+        }
+        async function setDefaultCategory(catId) {
+            if (!dbRef) { showCustomAlert("Datenbank nicht bereit."); return; }
+            if (!catId || !allCategories[catId]) { console.warn("Versuch, ungültige Kategorie als Standard festzulegen:", catId); showCustomAlert("Ungültiger Ordner kann nicht als Standard festgelegt werden."); return; }
+            if (defaultCategoryIdGlobal === catId) return;
+            try {
+                await update(child(dbRef, `${dataPath}/appSettings`), { defaultCategoryId: catId });
+                showCustomAlert(`"${allCategories[catId].name}" ist jetzt der Startordner.`);
+            } catch (error) { console.error("Fehler beim Festlegen des Startordners:", error); showCustomAlert("Fehler beim Festlegen des Startordners."); }
+        }
+
+        // --- Drink CRUD & Cloning ---
+        addDrinkButton.addEventListener('click', () => {
+            if (selectedCategoryId && allCategories[selectedCategoryId]) openDrinkModal(null, selectedCategoryId);
+            else if (Object.keys(allCategories).length > 0) { const firstCatId = Object.keys(allCategories)[0]; openDrinkModal(null, firstCatId); }
+            else showCustomAlert("Bitte erstelle zuerst einen Ordner, um einen Drink hinzuzufügen.");
+        });
+        staffAddNewRecipeMainBtn.addEventListener('click', () => {
+             if (selectedCategoryId && allCategories[selectedCategoryId]) openDrinkModalForNewRecipe(selectedCategoryId);
+             else showCustomAlert("Bitte wähle zuerst einen Ordner aus.");
+        });
+        staffAddExistingDrinkMainBtn.addEventListener('click', () => {
+             if (selectedCategoryId && allCategories[selectedCategoryId]) openAddExistingDrinkModal(selectedCategoryId);
+             else showCustomAlert("Bitte wähle zuerst einen Ordner aus.");
+        });
+        editModeCloneDrinkBtn.addEventListener('click', () => {
+            if (selectedCategoryId && allCategories[selectedCategoryId]) openAddExistingDrinkModal(selectedCategoryId);
+            else showCustomAlert("Bitte wähle zuerst einen Ordner aus, um einen Drink zu klonen.");
+        });
+        function populateCategorySelectInForms(selectedDrinkCategoryId = null) {
+            drinkCategorySelect.innerHTML = ''; sourceCategorySelect.innerHTML = '<option value="">-- Wähle Quell-Ordner --</option>';
+            const sortedCategories = Object.entries(allCategories).sort(([,a],[,b]) => (a.order || 0) - (b.order || 0));
+            sortedCategories.forEach(([id, category]) => {
+                const option = document.createElement('option'); option.value = id; option.textContent = category.name;
+                if (selectedDrinkCategoryId === id) option.selected = true;
+                drinkCategorySelect.appendChild(option.cloneNode(true));
+                const sourceOption = document.createElement('option'); sourceOption.value = id; sourceOption.textContent = category.name;
+                if(id === lastSelectedSourceCategoryIdForExistingDrink) sourceOption.selected = true;
+                sourceCategorySelect.appendChild(sourceOption);
+            });
+            if (!selectedDrinkCategoryId && drinkCategorySelect.options.length > 0) {
+                if (selectedCategoryId && allCategories[selectedCategoryId]) drinkCategorySelect.value = selectedCategoryId;
+                else if (drinkCategorySelect.options.length > 0) drinkCategorySelect.value = drinkCategorySelect.options[0].value;
+            }
+        }
+        function openDrinkModal(id = null, currentCatIdForNewDrink = null, isStaffNewRecipe = false, staffTargetCategoryId = null) {
+            drinkForm.reset(); document.getElementById('ingredientsContainer').innerHTML = '';
+            drinkIdInput.value = id || ''; drinkModalTargetCategoryIdInput.value = (isStaffNewRecipe && staffTargetCategoryId) ? staffTargetCategoryId : '';
+            let drinkCategoryIdForSelect = currentCatIdForNewDrink || selectedCategoryId || (Object.keys(allCategories).length > 0 ? Object.keys(allCategories)[0] : null);
+            if (id && allDrinks[id]) {
+                drinkModalTitle.textContent = 'Drink Bearbeiten'; const drink = allDrinks[id];
+                document.getElementById('drinkName').value = drink.name; document.getElementById('drinkType').value = drink.type;
+                document.getElementById('drinkSymbols').value = drink.symbols || '';
+                document.getElementById('drinkImageUrl').value = drink.imageUrl || '';
+                document.getElementById('drinkRecipe').value = drink.recipe;
+                drinkCategoryIdForSelect = drink.categoryId;
+                if (drink.ingredients && drink.ingredients.length > 0) drink.ingredients.forEach(ing => addIngredientField(ing.item, ing.amount));
+                else addIngredientField();
+                drinkCategorySelect.disabled = false;
+            } else {
+                if (isStaffNewRecipe && staffTargetCategoryId && allCategories[staffTargetCategoryId]) {
+                    drinkModalTitle.textContent = `Neues Rezept für "${allCategories[staffTargetCategoryId].name}"`;
+                    drinkCategoryIdForSelect = staffTargetCategoryId; drinkCategorySelect.disabled = true;
+                } else {
+                    drinkModalTitle.textContent = 'Neuen Drink Erstellen';
+                    drinkCategoryIdForSelect = currentCatIdForNewDrink; drinkCategorySelect.disabled = false;
+                }
+                 addIngredientField();
+            }
+            populateCategorySelectInForms(drinkCategoryIdForSelect);
+            if (isStaffNewRecipe && staffTargetCategoryId) drinkCategorySelect.value = staffTargetCategoryId;
+            if (!drinkCategorySelect.value && Object.keys(allCategories).length > 0 && drinkCategorySelect.options.length > 0) drinkCategorySelect.value = drinkCategorySelect.options[0].value;
+            else if (Object.keys(allCategories).length === 0) { showCustomAlert("Es muss mindestens ein Ordner existieren, um Drinks hinzuzufügen/bearbeiten."); return; }
+            drinkModal.classList.remove('hidden');
+        }
+        function openDrinkModalForNewRecipe(targetCategoryId) { openDrinkModal(null, null, true, targetCategoryId); }
+        drinkForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!dbRef) { showCustomAlert("Datenbank nicht bereit."); return; }
+            const id = drinkIdInput.value; const name = document.getElementById('drinkName').value.trim();
+            const type = document.getElementById('drinkType').value; const lockedStaffCategoryId = drinkModalTargetCategoryIdInput.value;
+            const categoryId = lockedStaffCategoryId ? lockedStaffCategoryId : drinkCategorySelect.value;
+            const symbols = document.getElementById('drinkSymbols').value.trim(); 
+            const imageUrl = document.getElementById('drinkImageUrl').value.trim();
+            const recipe = document.getElementById('drinkRecipe').value.trim();
+            if (!name || !type || !categoryId || !recipe) { showCustomAlert("Bitte fülle alle Pflichtfelder aus (Name, Typ, Ordner, Rezept)."); return; }
+            if (!allCategories[categoryId]) { showCustomAlert("Ungültiger Ordner ausgewählt."); return; }
+            const ingredients = [];
+            document.querySelectorAll('.ingredient-field').forEach(field => {
+                const item = field.querySelector('input[name="ingredientItem"]').value.trim();
+                const amount = field.querySelector('input[name="ingredientAmount"]').value.trim();
+                if (item && amount) ingredients.push({ item, amount });
+            });
+            if (ingredients.length === 0) { showCustomAlert("Bitte füge mindestens eine Zutat hinzu."); return; }
+            const drinkData = { name, type, categoryId, symbols, recipe, ingredients, imageUrl };
+            try {
+                if (id) { await update(child(dbRef, `${dataPath}/drinks/${id}`), drinkData); }
+                else { const newDrinkRef = push(child(dbRef, `${dataPath}/drinks`)); await set(newDrinkRef, drinkData); }
+                drinkModal.classList.add('hidden');
+            } catch (error) { console.error("Fehler beim Speichern des Drinks:", error); showCustomAlert("Fehler beim Speichern des Drinks."); }
+        });
+        document.getElementById('drinkCancel').addEventListener('click', () => drinkModal.classList.add('hidden'));
+        drinkModal.addEventListener('click', (e) => { if (e.target === drinkModal) drinkModal.classList.add('hidden'); });
+        document.getElementById('addIngredientBtn').addEventListener('click', () => addIngredientField());
+        function addIngredientField(item = '', amount = '') {
+            const ingredientsContainer = document.getElementById('ingredientsContainer');
+            const newField = document.createElement('div');
+            newField.className = 'ingredient-field flex space-x-2 mb-2 items-center';
+            newField.innerHTML = `
+                <input type="text" name="ingredientItem" placeholder="Zutat" value="${item}" class="flex-grow bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm">
+                <input type="text" name="ingredientAmount" placeholder="Menge" value="${amount}" class="w-1/3 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm">
+                <button type="button" class="remove-ingredient-btn text-red-500 dark:text-red-400 hover:text-red-400 dark:hover:text-red-300 p-2 rounded-md bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"><i class="fas fa-minus-circle"></i></button>
+            `;
+            ingredientsContainer.appendChild(newField);
+            newField.querySelector('.remove-ingredient-btn').addEventListener('click', () => newField.remove());
+        }
+        function handleEditDrink(id) { openDrinkModal(id); }
+        async function handleDeleteDrink(id) {
+            if (!dbRef) { showCustomAlert("Datenbank nicht bereit."); return; }
+            if (!allDrinks[id]) return;
+            showConfirmModal(`Sicher, dass du den Drink "${allDrinks[id].name}" löschen willst?`, async () => {
+                try { await remove(child(dbRef, `${dataPath}/drinks/${id}`)); }
+                catch (error) { console.error("Fehler beim Löschen des Drinks:", error); showCustomAlert("Fehler beim Löschen des Drinks."); }
+            });
+        }
+        function openAddExistingDrinkModal(targetCatId) {
+            if (!targetCatId || !allCategories[targetCatId]) { showCustomAlert("Ungültiger Zielordner."); return; }
+            addExistingDrinkTargetCategoryIdInput.value = targetCatId; populateCategorySelectInForms();
+            sourceDrinkSearchInput.value = ''; renderSourceDrinksList(); addExistingDrinkModal.classList.remove('hidden');
+        }
+        sourceCategorySelect.addEventListener('change', (e) => { lastSelectedSourceCategoryIdForExistingDrink = e.target.value; renderSourceDrinksList(); });
+        sourceDrinkSearchInput.addEventListener('input', renderSourceDrinksList);
+        document.getElementById('addExistingDrinkCancel').addEventListener('click', () => addExistingDrinkModal.classList.add('hidden'));
+        addExistingDrinkModal.addEventListener('click', (e) => { if (e.target === addExistingDrinkModal) addExistingDrinkModal.classList.add('hidden'); });
+        function renderSourceDrinksList() {
+            const selectedSourceCatId = sourceCategorySelect.value;
+            const searchTerm = sourceDrinkSearchInput.value.toLowerCase().trim();
+            sourceDrinksListContainer.innerHTML = '';
+            if (!selectedSourceCatId) { sourceDrinksListContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">Bitte Quell-Ordner wählen.</p>'; return; }
+            const drinksInSourceCategory = Object.entries(allDrinks).filter(([id, drink]) => {
+                return drink.categoryId === selectedSourceCatId && (drink.name.toLowerCase().includes(searchTerm) || (drink.ingredients || []).some(ing => ing.item.toLowerCase().includes(searchTerm)));
+            }).sort(([,a],[,b]) => a.name.localeCompare(b.name));
+            if (drinksInSourceCategory.length === 0) { sourceDrinksListContainer.innerHTML = `<p class="text-sm text-gray-500 dark:text-gray-400">Keine passenden Drinks in "${allCategories[selectedSourceCatId]?.name || 'diesem Ordner'}" gefunden.</p>`; return; }
+            drinksInSourceCategory.forEach(([drinkId, drink]) => {
+                const drinkDiv = document.createElement('div');
+                drinkDiv.className = 'p-3 bg-white dark:bg-gray-800 rounded-md shadow hover:bg-indigo-50 dark:hover:bg-gray-700 cursor-pointer transition-colors';
+                drinkDiv.innerHTML = `
+                    <h4 class="font-semibold text-indigo-600 dark:text-indigo-400">${drink.name} <span class="text-xs text-gray-500 dark:text-gray-400">(${drink.type})</span></h4>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">${(drink.ingredients || []).map(i => i.item).join(', ')}</p>
+                `;
+                drinkDiv.addEventListener('click', async () => {
+                    if (!dbRef) { showCustomAlert("Datenbank nicht bereit."); return; }
+                    const targetCategoryId = addExistingDrinkTargetCategoryIdInput.value;
+                    if (!targetCategoryId || !allCategories[targetCategoryId]) { showCustomAlert("Zielordner ist ungültig."); return; }
+                    const newDrinkData = { ...drink, categoryId: targetCategoryId }; delete newDrinkData.id;
+                    try {
+                        const newDrinkRef = push(child(dbRef, `${dataPath}/drinks`));
+                        await set(newDrinkRef, newDrinkData);
+                        showCustomAlert(`Drink "${drink.name}" wurde zum Ordner "${allCategories[targetCategoryId].name}" hinzugefügt/geklont.`);
+                        addExistingDrinkModal.classList.add('hidden');
+                    } catch (error) { console.error("Fehler beim Hinzufügen/Klonen des Drinks:", error); showCustomAlert("Fehler beim Hinzufügen/Klonen des Drinks."); }
+                });
+                sourceDrinksListContainer.appendChild(drinkDiv);
+            });
+        }
+        staffPurgeCategoryBtn.addEventListener('click', () => {
+            if (!dbRef) { showCustomAlert("Datenbank nicht bereit."); return; }
+            if (!staffModeActive || !selectedCategoryId || !allCategories[selectedCategoryId]) return;
+            const catSettings = allCategories[selectedCategoryId].staffSettings;
+            if (!catSettings || !catSettings.darfOrdnerLeeren) { showCustomAlert("Diese Aktion ist für diesen Ordner nicht erlaubt."); return; }
+            showConfirmModal(`Sicher, dass du ALLE Drinks im Ordner "${allCategories[selectedCategoryId].name}" löschen willst? Diese Aktion kann nicht rückgängig gemacht werden!`, async () => {
+                try {
+                    const updates = {};
+                    Object.entries(allDrinks).forEach(([drinkId, drink]) => { if (drink.categoryId === selectedCategoryId) updates[`${dataPath}/drinks/${drinkId}`] = null; });
+                    if (Object.keys(updates).length > 0) { await update(dbRef, updates); showCustomAlert(`Alle Drinks im Ordner "${allCategories[selectedCategoryId].name}" wurden gelöscht.`); }
+                    else showCustomAlert(`Ordner "${allCategories[selectedCategoryId].name}" ist bereits leer.`);
+                } catch (error) { console.error("Fehler beim Leeren des Ordners:", error); showCustomAlert("Fehler beim Leeren des Ordners."); }
+            });
+        });
+        async function handleQuickConfirmDrink(drinkIdToClone, drinkName) {
+            if (!dbRef) { showCustomAlert("Datenbank nicht bereit."); return; }
+            const originalDrink = allDrinks[drinkIdToClone];
+            if (!originalDrink || !allCategories[originalDrink.categoryId]) { showCustomAlert("Originaldrink oder dessen Ordner nicht gefunden."); return; }
+            const currentFolderSettings = allCategories[originalDrink.categoryId].staffSettings;
+            const targetFolderId = currentFolderSettings?.schnellbestaetigungZielordnerId;
+            if (!targetFolderId || !allCategories[targetFolderId]) { showCustomAlert("Zielordner für Schnellbestätigung ist nicht (mehr) gültig. Bitte in den Ordnereinstellungen prüfen."); return; }
+            const targetFolderName = allCategories[targetFolderId]?.name || "unbekanntem Ordner";
+            if (targetFolderId === originalDrink.categoryId) { showCustomAlert(`Drink "${drinkName}" ist bereits im Zielordner "${targetFolderName}".`); return; }
+            showConfirmModal(`Drink "${drinkName}" wirklich in den Ordner "${targetFolderName}" schnellbestätigen (kopieren)?`, async () => {
+                const drinkToCloneData = allDrinks[drinkIdToClone];
+                const newDrinkData = { ...drinkToCloneData, categoryId: targetFolderId }; delete newDrinkData.id;
+                try {
+                    const newDrinkRef = push(child(dbRef, `${dataPath}/drinks`));
+                    await set(newDrinkRef, newDrinkData);
+                    showCustomAlert(`Drink "${drinkName}" wurde erfolgreich in "${targetFolderName}" kopiert.`);
+                    if (recipePopupModal.classList.contains('hidden') === false) recipePopupModal.classList.add('hidden');
+                } catch (error) { console.error("Fehler bei der Schnellbestätigung:", error); showCustomAlert("Fehler bei der Schnellbestätigung des Drinks."); }
+            });
+        }
+        function showRecipePopup(drinkId) {
+            const drink = allDrinks[drinkId];
+            if (!drink || !allCategories[drink.categoryId]) { showCustomAlert("Drink oder zugehöriger Ordner nicht gefunden."); return; }
+            currentRecipePopupDrinkId = drinkId;
+            recipePopupTitle.textContent = drink.name + (drink.symbols ? ` ${drink.symbols}` : '');
+
+            // Handle image display
+            if (drink.imageUrl) {
+                recipePopupImage.src = drink.imageUrl;
+                recipePopupImage.onerror = () => { // Fallback if image fails to load
+                    recipePopupImageContainer.classList.add('hidden');
+                };
+                recipePopupImageContainer.classList.remove('hidden');
+            } else {
+                recipePopupImageContainer.classList.add('hidden');
+            }
+
+            let ingredientsHtml = 'Keine Zutaten gelistet.';
+            if (drink.ingredients && drink.ingredients.length > 0) {
+                ingredientsHtml = `<ul class="list-disc list-inside text-gray-600 dark:text-gray-300 space-y-0.5 text-sm">
+                    ${drink.ingredients.map(ing => `<li>${ing.amount} ${ing.item}</li>`).join('')}
+                </ul>`;
+            }
+            recipePopupContent.innerHTML = `
+                <div class="space-y-4">
+                    <div><h4 class="font-semibold text-indigo-500 dark:text-indigo-300 mb-1 text-sm">Typ:</h4><p class="text-gray-700 dark:text-gray-300 text-base">${drink.type}</p></div>
+                    <div><h4 class="font-semibold text-indigo-500 dark:text-indigo-300 mb-1 text-sm">Zutaten:</h4>${ingredientsHtml}</div>
+                    <div><h4 class="font-semibold text-indigo-500 dark:text-indigo-300 mb-1 text-sm">Rezept:</h4><p class="text-gray-700 dark:text-gray-300 text-base whitespace-pre-wrap">${drink.recipe || 'Kein Rezept vorhanden.'}</p></div>
+                </div>`;
+            const currentCategoryOfDrink = allCategories[drink.categoryId];
+            const staffSettings = currentCategoryOfDrink?.staffSettings;
+            const canQuickConfirm = staffModeActive && staffSettings?.darfSchnellbestaetigung && staffSettings.schnellbestaetigungZielordnerId && staffSettings.schnellbestaetigungZielordnerId !== drink.categoryId && allCategories[staffSettings.schnellbestaetigungZielordnerId];
+            recipePopupSchnellbestaetigungBtn.classList.toggle('hidden', !canQuickConfirm);
+            if (canQuickConfirm) recipePopupSchnellbestaetigungBtn.onclick = () => handleQuickConfirmDrink(currentRecipePopupDrinkId, drink.name);
+            recipePopupModal.classList.remove('hidden');
+        }
+        recipePopupCloseBtn.addEventListener('click', () => recipePopupModal.classList.add('hidden'));
+        recipePopupCloseBtnBottom.addEventListener('click', () => recipePopupModal.classList.add('hidden'));
+        recipePopupModal.addEventListener('click', (e) => { if (e.target === recipePopupModal) recipePopupModal.classList.add('hidden'); });
+        function showConfirmModal(text, callback) {
+            confirmModalText.textContent = text; confirmCallback = callback; confirmModal.classList.remove('hidden');
+        }
+        document.getElementById('confirmYes').addEventListener('click', () => { if (confirmCallback) confirmCallback(); confirmModal.classList.add('hidden'); });
+        document.getElementById('confirmNo').addEventListener('click', () => confirmModal.classList.add('hidden'));
+        confirmModal.addEventListener('click', (e) => { if (e.target === confirmModal) confirmModal.classList.add('hidden'); });
+
+        // --- Initial Application Load ---
+        function main() {
+            // Apply theme and initialize sidebar first
+            const initialTheme = localStorage.getItem('theme') || 'system';
+            applyTheme(initialTheme);
+            initializeSidebarState();
+            loadingIndicator.classList.remove('hidden'); 
+
+            const firebaseReady = initializeFirebase();
+
+            if (firebaseReady) {
+                initializeDefaultData().then(() => {
+                    loadData();
+                    updateActiveModesUI(); 
+
+                    const defaultFilterBtn = document.querySelector('.filter-btn[data-type="Alles"]');
+                    if (defaultFilterBtn) {
+                        defaultFilterBtn.classList.add('bg-indigo-600', 'dark:bg-indigo-500', 'text-white', 'ring-2', 'ring-indigo-400');
+                        defaultFilterBtn.classList.remove('text-gray-700', 'dark:text-gray-300');
+                    }
+                });
+            } else {
+                console.error("Firebase not ready, aborting further app initialization.");
+                loadingIndicator.classList.add('hidden');
+                if (noCategoriesMessage.classList.contains('hidden')) {
+                    noCategoriesMessage.textContent = "Firebase konnte nicht initialisiert werden.";
+                    noCategoriesMessage.classList.remove('hidden');
+                }
+            }
+        }
+
+        // Run the main function
+        main();
+    </script>
+
+</body>
+</html>
