@@ -2,7 +2,7 @@
 
 // Define a unique cache name for your app's assets.
 // Increment this version if you update any of the cached files.
-const CACHE_NAME = 'bar-organizer-deluxe-cache-v2.5';
+const CACHE_NAME = 'bar-organizer-deluxe-cache-v2.7';
 
 // List of URLs to cache when the service worker is installed.
 const URLS_TO_CACHE = [
