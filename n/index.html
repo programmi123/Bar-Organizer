@@ -164,6 +164,20 @@
         .dark input[readonly].ingredient-search-input {
             background-color: #4b5563; /* gray-600 */
         }
+        /* Toggle Switch Styles */
+        .toggle-checkbox:checked {
+            transform: translateX(1rem);
+            border-color: #4f46e5; /* indigo-600 */
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #4f46e5; /* indigo-600 */
+        }
+        .dark .toggle-checkbox:checked {
+            border-color: #6366f1; /* indigo-500 */
+        }
+        .dark .toggle-checkbox:checked + .toggle-label {
+            background-color: #6366f1; /* indigo-500 */
+        }
     </style>
 </head>
 <body class="font-sans leading-normal tracking-normal bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-colors duration-300">
@@ -336,6 +350,18 @@
     <div id="drinkModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50 overflow-y-auto print:hidden">
         <form id="drinkForm" class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-2xl space-y-5 max-h-[90vh] overflow-y-auto">
             <h3 id="drinkModalTitle" class="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">Drink Bearbeiten</h3>
+            <div id="emptyFieldsToggleContainer" class="hidden items-center justify-between bg-yellow-50 dark:bg-gray-700/50 p-3 rounded-lg border border-yellow-200 dark:border-gray-600">
+                <div class="flex flex-col">
+                    <label for="allowEmptyFieldsToggle" class="text-sm font-medium text-yellow-800 dark:text-yellow-200 cursor-pointer">
+                        Schnelleingabe
+                    </label>
+                    <span class="text-xs text-yellow-600 dark:text-yellow-400">Erlaubt das Speichern ohne Rezept & Zutaten.</span>
+                </div>
+                <div class="relative inline-block w-10 mr-2 align-middle select-none">
+                    <input type="checkbox" name="allowEmptyFieldsToggle" id="allowEmptyFieldsToggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-transform duration-200 ease-in-out"/>
+                    <label for="allowEmptyFieldsToggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 dark:bg-gray-600 cursor-pointer"></label>
+                </div>
+            </div>
             <input type="hidden" id="drinkId">
             <input type="hidden" id="drinkModalTargetCategoryId">
             <div>
@@ -366,7 +392,7 @@
                 <input type="text" id="drinkSymbols" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2.5 text-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Zutaten*</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 ingredients-label">Zutaten*</label>
                 <div id="ingredientsContainer" class="space-y-3">
                     <!-- Ingredients populated by JS -->
                 </div>
@@ -662,7 +688,6 @@
         const recipePopupCloseBtnBottom = document.getElementById('recipePopupCloseBtnBottom');
         const recipePopupSchnellbestaetigungBtn = document.getElementById('recipePopupSchnellbestaetigungBtn');
         let currentRecipePopupDrinkId = null;
-        // New Ingredient Editor UI Refs
         const dataManagementSection = document.getElementById('dataManagementSection');
         const manageIngredientsBtn = document.getElementById('manageIngredientsBtn');
         const ingredientEditorModal = document.getElementById('ingredientEditorModal');
@@ -670,6 +695,8 @@
         const ingredientListContainer = document.getElementById('ingredientListContainer');
         const addIngredientForm = document.getElementById('addIngredientForm');
         const newIngredientNameInput = document.getElementById('newIngredientName');
+        const emptyFieldsToggleContainer = document.getElementById('emptyFieldsToggleContainer');
+        const allowEmptyFieldsToggle = document.getElementById('allowEmptyFieldsToggle');
 
 
         // --- Custom Alert Modal Helper ---
@@ -1427,6 +1454,26 @@
                 sourceCategorySelect.value = lastSelectedSourceCategoryIdForExistingDrink;
             }
         }
+        
+        function toggleRequiredFields(disabled) {
+            const recipeTextarea = document.getElementById('drinkRecipe');
+            const recipeLabel = document.querySelector('label[for="drinkRecipe"]');
+            const ingredientsLabel = document.querySelector('.ingredients-label');
+
+            recipeTextarea.required = !disabled;
+            
+            if (disabled) {
+                recipeLabel.textContent = "Rezept";
+                ingredientsLabel.textContent = "Zutaten";
+            } else {
+                recipeLabel.textContent = "Rezept*";
+                ingredientsLabel.textContent = "Zutaten*";
+            }
+        }
+
+        allowEmptyFieldsToggle.addEventListener('change', () => {
+            toggleRequiredFields(allowEmptyFieldsToggle.checked);
+        });
 
         function openDrinkModal(id = null, currentCatIdForNewDrink = null, isStaffNewRecipe = false, staffTargetCategoryId = null) {
             drinkForm.reset();
@@ -1440,6 +1487,9 @@
             
             if (id && allDrinks[id]) { // Editing an existing drink
                 drinkModalTitle.textContent = 'Drink Bearbeiten';
+                emptyFieldsToggleContainer.classList.add('hidden');
+                allowEmptyFieldsToggle.checked = false;
+
                 const drink = allDrinks[id];
                 document.getElementById('drinkName').value = drink.name;
                 document.getElementById('drinkType').value = drink.type;
@@ -1457,6 +1507,9 @@
                 drinkCategorySelect.disabled = false;
             } else { // Creating a new drink
                 addIngredientField();
+                emptyFieldsToggleContainer.classList.remove('hidden');
+                allowEmptyFieldsToggle.checked = false;
+
                 if (isStaffNewRecipe && staffTargetCategoryId && allCategories[staffTargetCategoryId]) {
                     drinkModalTitle.textContent = `Neues Rezept für "${allCategories[staffTargetCategoryId].name}"`;
                     drinkCategoryIdForSelect = staffTargetCategoryId;
@@ -1477,6 +1530,7 @@
                 return;
             }
             
+            toggleRequiredFields(allowEmptyFieldsToggle.checked);
             drinkModal.classList.remove('hidden');
         }
 
@@ -1488,13 +1542,18 @@
             const id = drinkIdInput.value;
             const name = document.getElementById('drinkName').value.trim();
             const type = document.getElementById('drinkType').value;
-            const lockedStaffCategoryId = drinkModalTargetCategoryIdInput.value;
-            const categoryId = lockedStaffCategoryId || drinkCategorySelect.value;
+            const categoryId = drinkModalTargetCategoryIdInput.value || drinkCategorySelect.value;
             const symbols = document.getElementById('drinkSymbols').value.trim(); 
             const imageUrl = document.getElementById('drinkImageUrl').value.trim();
-            const recipe = document.getElementById('drinkRecipe').value.trim();
-            if (!name || !type || !categoryId || !recipe) { showCustomAlert("Bitte fülle alle Pflichtfelder aus (Name, Typ, Ordner, Rezept)."); return; }
+            let recipe = document.getElementById('drinkRecipe').value.trim();
+            const allowEmpty = allowEmptyFieldsToggle.checked;
+
+            if (!name || !type || !categoryId) { 
+                showCustomAlert("Bitte fülle alle Pflichtfelder aus (Name, Typ, Ordner)."); 
+                return; 
+            }
             if (!allCategories[categoryId]) { showCustomAlert("Ungültiger Ordner ausgewählt."); return; }
+
             const ingredients = [];
             let allIngredientsValid = true;
             document.querySelectorAll('.ingredient-field').forEach(field => {
@@ -1513,7 +1572,19 @@
                 showCustomAlert("Bitte für jede Zutat eine gültige Auswahl treffen und eine Menge angeben.");
                 return;
             }
-            if (ingredients.length === 0) { showCustomAlert("Bitte füge mindestens eine Zutat hinzu."); return; }
+
+            if (!allowEmpty) {
+                if (!recipe) {
+                    showCustomAlert("Bitte fülle das Rezept aus.");
+                    return;
+                }
+                if (ingredients.length === 0) {
+                    showCustomAlert("Bitte füge mindestens eine Zutat hinzu.");
+                    return;
+                }
+            } else {
+                if (!recipe) recipe = '';
+            }
 
             const drinkData = { name, type, categoryId, symbols, recipe, ingredients, imageUrl };
             try {
