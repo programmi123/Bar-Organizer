@@ -357,31 +357,35 @@
                     </div>
 
                     <div class="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center">
-                        <div class="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-                            <div class="seg flex-shrink-0" role="group" aria-label="Typ filtern">
+                        <!-- Row 1: type + favourites -->
+                        <div class="flex items-center gap-2">
+                            <div class="seg flex-1 lg:flex-none" role="group" aria-label="Typ filtern">
                                 <button data-type="Alles" class="filter-btn seg-btn is-active">Alles</button>
                                 <button data-type="Mocktail" class="filter-btn seg-btn">Mocktails</button>
                                 <button data-type="Cocktail" class="filter-btn seg-btn">Cocktails</button>
                             </div>
-                            <button id="favFilterBtn" class="btn btn-secondary btn-sm flex-shrink-0" aria-pressed="false" aria-label="Nur Favoriten"><i class="far fa-star"></i><span class="hidden sm:inline">Favoriten</span></button>
-                            <button id="openFilterBtn" class="btn btn-secondary btn-sm flex-shrink-0"><i class="fas fa-filter"></i> Filter <span id="filterCount" class="hidden rounded-full bg-indigo-600 px-1.5 text-[10px] text-white"></span></button>
-                            <button id="selectModeBtn" class="btn btn-secondary btn-sm hidden flex-shrink-0"><i class="far fa-square-check"></i> Auswählen</button>
+                            <button id="favFilterBtn" class="btn btn-secondary btn-sm h-9 flex-shrink-0" aria-pressed="false" aria-label="Nur Favoriten"><i class="far fa-star"></i><span class="hidden sm:inline">Favoriten</span></button>
                         </div>
-                        <div class="flex items-center gap-2 lg:ml-auto">
-                            <label id="searchAllWrap" class="hidden items-center gap-2 rounded-lg bg-white px-3 py-1.5 text-xs font-medium shadow-sm dark:bg-plum-900">
+                        <!-- Row 2: filter, selection, sort, view -->
+                        <div class="flex flex-wrap items-center gap-2 lg:flex-1">
+                            <button id="openFilterBtn" class="btn btn-secondary btn-sm h-9"><i class="fas fa-filter"></i> Filter <span id="filterCount" class="hidden rounded-full bg-indigo-600 px-1.5 text-[10px] text-white"></span></button>
+                            <button id="selectModeBtn" class="btn btn-secondary btn-sm hidden h-9"><i class="far fa-square-check"></i> Auswählen</button>
+                            <label id="searchAllWrap" class="hidden h-9 items-center gap-2 rounded-lg bg-white px-3 text-xs font-medium shadow-sm dark:bg-plum-900">
                                 <input id="searchAllToggle" type="checkbox" class="check h-4 w-4"> Alle Ordner
                             </label>
-                            <select id="sortSelect" class="input ml-auto w-auto py-1.5 text-xs lg:ml-0" aria-label="Sortierung">
-                                <option value="name">Name A–Z</option>
-                                <option value="name-desc">Name Z–A</option>
-                                <option value="newest">Neueste zuerst</option>
-                                <option value="updated">Zuletzt bearbeitet</option>
-                                <option value="favorites">Favoriten zuerst</option>
-                                <option value="ingredients">Wenigste Zutaten</option>
-                            </select>
-                            <div class="seg flex-shrink-0" role="group" aria-label="Ansicht">
-                                <button data-view="grid" class="view-btn seg-btn is-active" title="Kacheln" aria-label="Kachelansicht"><i class="fas fa-grip"></i></button>
-                                <button data-view="list" class="view-btn seg-btn" title="Liste" aria-label="Listenansicht"><i class="fas fa-list"></i></button>
+                            <div class="ml-auto flex items-center gap-2">
+                                <select id="sortSelect" class="input h-9 w-auto py-1 text-xs" aria-label="Sortierung">
+                                    <option value="name">Name A–Z</option>
+                                    <option value="name-desc">Name Z–A</option>
+                                    <option value="newest">Neueste zuerst</option>
+                                    <option value="updated">Zuletzt bearbeitet</option>
+                                    <option value="favorites">Favoriten zuerst</option>
+                                    <option value="ingredients">Wenigste Zutaten</option>
+                                </select>
+                                <div class="seg flex-shrink-0" role="group" aria-label="Ansicht">
+                                    <button data-view="grid" class="view-btn seg-btn is-active" title="Kacheln" aria-label="Kachelansicht"><i class="fas fa-grip"></i></button>
+                                    <button data-view="list" class="view-btn seg-btn" title="Liste" aria-label="Listenansicht"><i class="fas fa-list"></i></button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -946,6 +950,6 @@
             });
         }
     </script>
-    <script type="module" src="./app.js?v=3.1.1"></script>
+    <script type="module" src="./app.js?v=3.1.2"></script>
 </body>
 </html>
