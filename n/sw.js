@@ -1,6 +1,6 @@
 // sw.js – Bar Organizer Deluxe
 // Increment the version whenever cached files change.
-const VERSION = 'v3.0.0';
+const VERSION = 'v3.1.0';
 const STATIC_CACHE = `bar-organizer-static-${VERSION}`;
 const RUNTIME_CACHE = `bar-organizer-runtime-${VERSION}`;
 const IMAGE_CACHE = 'bar-organizer-images';   // kept across versions, size-limited

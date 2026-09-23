@@ -32,6 +32,7 @@ let allCategories = {};
 let allDrinks = {};
 let allIngredients = {};
 let appSettings = {};
+let tagMeta = {};
 let currentRev = null;
 let me = null;                 // { uid, email, emailVerified, displayName, role, permissions, favorites }
 let serverSettings = {};
@@ -46,6 +47,11 @@ let sortableInstance = null;
 let ingredientSortable = null;
 let currentRecipePopupDrinkId = null;
 let prefs = loadPrefs();
+let selectMode = false;
+const selectedDrinks = new Set();
+const emptyFilters = () => ({ tags: [], tagMode: 'all', glass: '', include: [], exclude: [], maxIngredients: 0, image: 'any', completeness: 'any', recent: 0 });
+let filters = emptyFilters();
+let extensionsLoaded = false;
 
 function loadPrefs() {
     const d = { view: 'grid', sort: 'name', showImages: true, clampRecipe: true, searchAll: false, lastCategory: null };
@@ -77,6 +83,7 @@ const perm = (k) => !!me?.permissions?.[k];
 const isEdit = () => mode === 'edit';
 const isStaff = () => mode === 'staff';
 
+const BLOCKING_CODES = ['account_disabled', 'not_registered', 'email_unverified', 'maintenance', 'session_expired', 'password_change_required'];
 class ApiError extends Error { constructor(code, message, status) { super(message); this.code = code; this.status = status; } }
 
 // ============================================================================
@@ -126,11 +133,12 @@ function closeModal(el, force = false) {
     if (i >= 0) modalStack.splice(i, 1);
     if (el.id === 'recipePopupModal') currentRecipePopupDrinkId = null;
 }
-document.querySelectorAll('.modal').forEach((m) => {
+function wireModal(m) {
     m.addEventListener('mousedown', (e) => { m._downOnBackdrop = e.target === m; });
     m.addEventListener('click', (e) => { if (e.target === m && m._downOnBackdrop && m.id !== 'confirmModal' && m.id !== 'customAlertModal') closeModal(m); });
     m.querySelectorAll('.modal-close').forEach((b) => b.addEventListener('click', () => closeModal(m)));
-});
+}
+document.querySelectorAll('.modal').forEach(wireModal);
 
 let formSnapshots = {};
 function snapshotForm(id) { formSnapshots[id] = serializeForm(id); }
@@ -205,7 +213,7 @@ async function api(path, { method = 'GET', body, authed = true, retry = true } =
     }
     if (!res.ok) {
         const err = new ApiError(data.error || `http_${res.status}`, data.message || `Fehler (${res.status}).`, res.status);
-        if (['account_disabled', 'not_registered', 'email_unverified'].includes(err.code)) handleBlocked(err);
+        if (BLOCKING_CODES.includes(err.code)) handleBlocked(err);
         throw err;
     }
     return data;
@@ -232,10 +240,11 @@ function showScreen(which) {
     $('appShell').classList.toggle('hidden', which !== 'app');
 }
 function showAuthView(view) {
-    ['loginForm', 'registerForm', 'forgotForm', 'blockedView'].forEach((id) => $(id).classList.add('hidden'));
-    const map = { login: 'loginForm', register: 'registerForm', forgot: 'forgotForm', blocked: 'blockedView' };
+    ['loginForm', 'registerForm', 'forgotForm', 'blockedView', 'forcePwForm'].forEach((id) => $(id).classList.add('hidden'));
+    const map = { login: 'loginForm', register: 'registerForm', forgot: 'forgotForm', blocked: 'blockedView', forcePw: 'forcePwForm' };
     $(map[view]).classList.remove('hidden');
-    ['loginError', 'registerError', 'forgotMsg'].forEach((id) => $(id).classList.add('hidden'));
+    ['registerError', 'forgotMsg', 'forcePwError'].forEach((id) => $(id).classList.add('hidden'));
+    if (view !== 'login') $('loginError').classList.add('hidden');
     if (view === 'forgot' && $('loginEmail').value) $('forgotEmail').value = $('loginEmail').value;
     const first = $(map[view]).querySelector('input');
     if (first && window.innerWidth >= 640) setTimeout(() => first.focus(), 30);
@@ -263,17 +272,44 @@ function authErrorMessage(e) {
     return e?.message || 'Unbekannter Fehler.';
 }
 
+let minPwLength = 8;
 async function loadPublicConfig() {
     try {
         const cfg = await api('/api/public-config', { authed: false });
         $('registerLinkWrap').classList.toggle('hidden', !cfg.registrationEnabled);
+        minPwLength = cfg.minPasswordLength || 8;
+        $('regPwHint').textContent = `Mindestens ${minPwLength} Zeichen.${cfg.allowedEmailDomains?.length ? ` Nur Adressen von ${cfg.allowedEmailDomains.join(', ')}.` : ''}`;
+        if (cfg.barName) $('authTitle').textContent = cfg.barName;
     } catch { $('registerLinkWrap').classList.remove('hidden'); }
 }
+
+$('forcePwForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cur = $('fpCurrent').value; const nw = $('fpNew').value;
+    if (!cur) return showFormError('forcePwError', 'Bitte das vorläufige Passwort eingeben.');
+    if (nw.length < minPwLength) return showFormError('forcePwError', `Das neue Passwort muss mindestens ${minPwLength} Zeichen lang sein.`);
+    if (nw === cur) return showFormError('forcePwError', 'Das neue Passwort muss sich vom vorläufigen unterscheiden.');
+    if (nw !== $('fpNew2').value) return showFormError('forcePwError', 'Die Passwörter stimmen nicht überein.');
+    await withBusy(e.submitter, async () => {
+        try {
+            const user = auth.currentUser;
+            await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, cur));
+            await updatePassword(user, nw);
+            await user.getIdToken(true);
+            await api('/api/me', { method: 'POST', body: { action: 'confirmPasswordChange' } });
+            $('forcePwForm').reset();
+            toast('Passwort gespeichert.', 'success');
+            bootApp();
+        } catch (err) { showFormError('forcePwError', err instanceof ApiError ? err.message : authErrorMessage(err)); }
+    });
+});
+$('forcePwLogout').addEventListener('click', () => logout());
 
 $('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = $('loginEmail').value.trim();
     const pw = $('loginPassword').value;
+    $('loginError').classList.add('hidden');
     if (!email || !pw) return showFormError('loginError', 'Bitte E-Mail und Passwort eingeben.');
     const btn = e.submitter || $('loginForm').querySelector('[type=submit]');
     await withBusy(btn, async () => {
@@ -307,7 +343,7 @@ $('registerForm').addEventListener('submit', async (e) => {
     const email = $('regEmail').value.trim();
     const pw = $('regPassword').value;
     if (!displayName || !email) return showFormError('registerError', 'Bitte Name und E-Mail angeben.');
-    if (pw.length < 8) return showFormError('registerError', 'Das Passwort muss mindestens 8 Zeichen lang sein.');
+    if (pw.length < minPwLength) return showFormError('registerError', `Das Passwort muss mindestens ${minPwLength} Zeichen lang sein.`);
     if (pw !== $('regPassword2').value) return showFormError('registerError', 'Die Passwörter stimmen nicht überein.');
     const btn = $('registerForm').querySelector('[type=submit]');
     await withBusy(btn, async () => {
@@ -346,19 +382,65 @@ $('forgotForm').addEventListener('submit', async (e) => {
     });
 });
 
-function handleBlocked(err) {
+let blockedHandling = false;
+async function handleBlocked(err) {
     stopStream();
+    if (err.code === 'session_expired') {
+        if (blockedHandling) return;
+        blockedHandling = true;
+        await logout();
+        blockedHandling = false;
+        showFormError('loginError', err.message);
+        return;
+    }
     showScreen('auth');
+    if (err.code === 'password_change_required') {
+        showAuthView('forcePw');
+        return;
+    }
     showAuthView('blocked');
-    const titles = { account_disabled: 'Konto gesperrt', not_registered: 'Konto nicht freigeschaltet', email_unverified: 'E-Mail bestätigen' };
+    const titles = { account_disabled: 'Konto gesperrt', not_registered: 'Konto nicht freigeschaltet', email_unverified: 'E-Mail bestätigen', maintenance: 'Wartungsarbeiten' };
     $('blockedTitle').textContent = titles[err.code] || 'Kein Zugriff';
     $('blockedText').textContent = err.message;
     $('blockedResendBtn').classList.toggle('hidden', err.code !== 'email_unverified');
+    if (err.code === 'email_unverified') startVerifyWatch({ onVerified: () => bootApp() });
+    if (err.code === 'maintenance') setTimeout(() => { if (auth.currentUser && !$('blockedView').classList.contains('hidden')) bootApp(); }, 60000);
 }
+
+// ---- E-mail verification: detect the click on the link without logging out and in again ----
+let verifyTimer = null;
+let verifyStarted = 0;
+function stopVerifyWatch() { clearInterval(verifyTimer); verifyTimer = null; }
+async function checkVerified(onVerified) {
+    const u = auth.currentUser;
+    if (!u) return stopVerifyWatch();
+    try {
+        await u.reload();
+        if (auth.currentUser?.emailVerified) {
+            stopVerifyWatch();
+            await auth.currentUser.getIdToken(true);   // new token now carries email_verified = true
+            toast('E-Mail-Adresse bestätigt.', 'success');
+            onVerified();
+        }
+    } catch { /* offline etc. */ }
+}
+function startVerifyWatch({ onVerified }) {
+    stopVerifyWatch();
+    verifyStarted = Date.now();
+    const tick = () => {
+        if (Date.now() - verifyStarted > 30 * 60 * 1000) return stopVerifyWatch();
+        if (document.visibilityState === 'visible') checkVerified(onVerified);
+    };
+    verifyTimer = setInterval(tick, 6000);
+    startVerifyWatch.onVerified = onVerified;
+}
+window.addEventListener('focus', () => { if (verifyTimer && startVerifyWatch.onVerified) checkVerified(startVerifyWatch.onVerified); });
+
 $('blockedRetryBtn').addEventListener('click', async () => {
     if (!auth.currentUser) return showAuthView('login');
     await auth.currentUser.reload().catch(() => {});
     await auth.currentUser.getIdToken(true).catch(() => {});
+    stopVerifyWatch();
     bootApp();
 });
 $('blockedResendBtn').addEventListener('click', () => resendVerification($('blockedResendBtn')));
@@ -374,6 +456,8 @@ async function resendVerification(btn) {
 
 async function logout() {
     stopStream();
+    stopVerifyWatch();
+    setSelectMode(false);
     closeAllMenus();
     modalStack.slice().forEach((m) => closeModal(m, true));
     try { sessionStorage.removeItem('barMode'); } catch { /* ignore */ }
@@ -394,6 +478,8 @@ onAuthStateChanged(auth, (user) => {
 function resetAppState() {
     allCategories = {}; allDrinks = {}; allIngredients = {}; appSettings = {};
     me = null; mode = 'view'; initialLoadComplete = false; currentRev = null; selectedCategoryId = null;
+    tagMeta = {}; filters = emptyFilters(); extensionsLoaded = false;
+    document.querySelectorAll('[data-ext-item]').forEach((el) => el.remove());
     $('drinksContainer').innerHTML = '';
     $('categoriesContainer').innerHTML = '';
 }
@@ -404,8 +490,9 @@ async function bootApp() {
     try {
         await refreshState({ throwOnError: true });
         startStream();
+        loadExtensions();
     } catch (e) {
-        if (!['account_disabled', 'not_registered', 'email_unverified'].includes(e.code)) {
+        if (!BLOCKING_CODES.includes(e.code)) {
             $('loadingIndicator').classList.add('hidden');
             $('noCategoriesMessage').textContent = `${e.message}`;
             $('noCategoriesMessage').classList.remove('hidden');
@@ -445,6 +532,7 @@ function applyState(s) {
     allDrinks = s.data.drinks || {};
     allIngredients = s.data.ingredients || {};
     appSettings = s.data.appSettings || {};
+    tagMeta = s.data.tagMeta || {};
     currentRev = s.data.rev ?? null;
     me.favorites = me.favorites || {};
 
@@ -473,9 +561,16 @@ function applyState(s) {
         selectedCategoryId = (defaultId && allCategories[defaultId]) ? defaultId : (sortedCategoryEntries()[0]?.[0] || null);
     }
 
+    // Drop selections/filters that no longer exist
+    for (const id of [...selectedDrinks]) if (!allDrinks[id]) selectedDrinks.delete(id);
+    if (mode !== 'edit' && selectMode) setSelectMode(false);
+
     $('loadingIndicator').classList.add('hidden');
     $('noCategoriesMessage').classList.toggle('hidden', Object.keys(allCategories).length > 0);
     updateUserUI();
+    renderAnnouncement();
+    if (!me.emailVerified && !verifyTimer) startVerifyWatch({ onVerified: () => refreshState() });
+    if (!$('tagModal').classList.contains('hidden')) renderTagList();
     updateActiveModesUI();
     if (!$('ingredientEditorModal').classList.contains('hidden')) renderIngredientEditor();
     if (!$('addExistingDrinkModal').classList.contains('hidden')) { populateCategorySelectInForms(); renderSourceDrinksList(); }
@@ -580,7 +675,7 @@ function setSidebar(open) {
     if (isMobile()) { sidebarOverlay.classList.toggle('hidden', !open); mainArea.classList.remove('md:ml-64'); }
     else { sidebarOverlay.classList.add('hidden'); mainArea.classList.toggle('md:ml-64', open); }
 }
-function toggleSidebar() { setSidebar(sidebar.classList.contains('-translate-x-full')); }
+function toggleSidebar() { setSidebar(sidebar.classList.contains('-translate-x-full')); if (selectMode) updateBulkBar(); }
 $('sidebarOpenBtn').addEventListener('click', toggleSidebar);
 $('sidebarCloseBtn').addEventListener('click', () => setSidebar(false));
 sidebarOverlay.addEventListener('click', () => setSidebar(false));
@@ -593,7 +688,7 @@ function initializeSidebarState() {
 }
 window.addEventListener('resize', initializeSidebarState);
 initializeSidebarState();
-$('sidebarUserBtn').addEventListener('click', () => openProfile());
+$('tagBrowserBtn').addEventListener('click', () => { if (isMobile()) setSidebar(false); openTagModal(); });
 $('folderFilterInput').addEventListener('input', renderCategories);
 
 // ============================================================================
@@ -625,11 +720,11 @@ $('userMenuBtn').addEventListener('click', (e) => {
 document.addEventListener('click', (e) => { if (!e.target.closest('#userMenu')) closeAllMenus(); });
 $('menuProfileBtn').addEventListener('click', () => { closeAllMenus(); openProfile(); });
 $('menuUsersBtn').addEventListener('click', () => { closeAllMenus(); openUsersPanel(); });
-$('menuSettingsBtn').addEventListener('click', () => { closeAllMenus(); openModal($('settingsModal')); });
 $('menuLogoutBtn').addEventListener('click', () => logout());
 $('settingsButton').addEventListener('click', () => openModal($('settingsModal')));
-$('settingsUsersBtn').addEventListener('click', () => { closeModal($('settingsModal')); openUsersPanel(); });
 $('verifyBannerBtn').addEventListener('click', () => resendVerification($('verifyBannerBtn')));
+$('verifyBanner').insertAdjacentHTML('beforeend', ' <button id="verifyCheckBtn" class="ml-2 font-semibold underline">Schon bestätigt?</button>');
+$('verifyCheckBtn').addEventListener('click', () => checkVerified(() => refreshState()));
 
 $('showImagesToggle').checked = prefs.showImages;
 $('clampRecipeToggle').checked = prefs.clampRecipe;
@@ -641,19 +736,80 @@ function roleChip(role) {
     return `<span class="chip" style="background:${c}22;color:${c};box-shadow:inset 0 0 0 1px ${c}55">${esc(role?.name || 'Standard')}</span>`;
 }
 
+function hasPanelAccess() {
+    return ['admin', 'manageUsers', 'disableUsers', 'deleteUsers', 'resetPasswords', 'manageRoles', 'manageSettings', 'viewAudit', 'exportData', 'importData'].some(perm);
+}
+
 function updateUserUI() {
     if (!me) return;
     const name = me.displayName || me.email;
     const ini = initials(name);
-    ['userMenuBtn', 'sidebarAvatar', 'profileAvatar'].forEach((id) => { $(id).textContent = ini; });
+    ['userMenuBtn', 'profileAvatar'].forEach((id) => { $(id).textContent = ini; });
+    $('userMenuBtn').style.background = safeColor(me.role?.color || '#4f46e5');
     $('userMenuName').textContent = name;
     $('userMenuEmail').textContent = me.email;
-    $('sidebarUserName').textContent = name;
-    $('sidebarUserRole').textContent = me.role?.name || 'Standard';
-    const userPanel = perm('admin') || perm('manageUsers') || perm('disableUsers') || perm('deleteUsers');
-    $('menuUsersBtn').classList.toggle('hidden', !userPanel);
-    $('settingsUsersSection').classList.toggle('hidden', !userPanel);
+    $('userMenuRole').innerHTML = roleChip(me.role);
+    $('menuUsersBtn').classList.toggle('hidden', !hasPanelAccess());
     $('verifyBanner').classList.toggle('hidden', !!me.emailVerified);
+    const title = serverSettings.barName || 'Bar Organizer';
+    $('appTitle').textContent = title;
+    document.title = serverSettings.barName ? `${serverSettings.barName} – Bar Organizer` : 'Bar Organizer Deluxe';
+    $('selectModeBtn').classList.toggle('hidden', !isEdit());
+}
+
+function renderAnnouncement() {
+    const el = $('announcementBanner');
+    const text = (serverSettings.announcementText || '').trim();
+    const maint = serverSettings.maintenanceMode;
+    const locked = serverSettings.lockEditing && !perm('admin') && (perm('editMode') || perm('staffMode'));
+    let key = '';
+    try { key = localStorage.getItem('barAnnDismissed') || ''; } catch { /* ignore */ }
+    const parts = [];
+    const styles = { info: 'bg-indigo-50 text-indigo-900 dark:bg-indigo-950/60 dark:text-indigo-100', warning: 'bg-amber-50 text-amber-900 dark:bg-amber-950/60 dark:text-amber-100', success: 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-100' };
+    if (maint) parts.push(`<div class="flex items-center gap-2 px-4 py-2 text-sm ${styles.warning}"><i class="fas fa-screwdriver-wrench"></i><span>Wartungsmodus ist aktiv – nur Administratoren haben Zugriff.</span></div>`);
+    if (locked) parts.push(`<div class="flex items-center gap-2 px-4 py-2 text-sm ${styles.warning}"><i class="fas fa-lock"></i><span>Die Bearbeitung ist derzeit gesperrt.</span></div>`);
+    if (text && key !== text) {
+        const lvl = styles[serverSettings.announcementLevel] ? serverSettings.announcementLevel : 'info';
+        const icon = { info: 'fa-bullhorn', warning: 'fa-triangle-exclamation', success: 'fa-circle-check' }[lvl];
+        parts.push(`<div class="flex items-start gap-2 px-4 py-2.5 text-sm ${styles[lvl]}"><i class="fas ${icon} mt-0.5"></i><span class="flex-1 whitespace-pre-wrap selectable">${esc(text)}</span><button id="annDismiss" class="px-1 opacity-70 hover:opacity-100" aria-label="Ausblenden"><i class="fas fa-times"></i></button></div>`);
+    }
+    el.innerHTML = parts.join('');
+    el.classList.toggle('hidden', !parts.length);
+    $('annDismiss')?.addEventListener('click', () => { try { localStorage.setItem('barAnnDismissed', text); } catch { /* ignore */ } renderAnnouncement(); });
+}
+
+// ---- Extensions: optional modules the server delivers only to specific accounts ----
+function downloadJson(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function addMenuItem({ label, icon, onClick }) {
+    const b = document.createElement('button');
+    b.className = 'menu-item';
+    b.setAttribute('role', 'menuitem');
+    b.dataset.extItem = '1';
+    b.innerHTML = `<i class="fas ${esc(icon || 'fa-puzzle-piece')} w-4 text-center"></i> <span></span>`;
+    b.querySelector('span').textContent = label;
+    b.addEventListener('click', () => { closeAllMenus(); onClick(); });
+    $('menuExtSlot').appendChild(b);
+}
+async function loadExtensions() {
+    if (extensionsLoaded || !auth.currentUser) return;
+    extensionsLoaded = true;
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch(`${WORKER_URL}/api/ext`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+        if (res.status !== 200 || !(res.headers.get('Content-Type') || '').includes('javascript')) return;
+        const url = URL.createObjectURL(new Blob([await res.text()], { type: 'text/javascript' }));
+        try {
+            const mod = await import(url);
+            mod.default?.({ api, toast, showConfirm, showCustomAlert, openModal, closeModal, wireModal, esc, addMenuItem, refreshState, downloadJson });
+        } finally { URL.revokeObjectURL(url); }
+    } catch (e) { extensionsLoaded = false; console.warn('extension load failed', e); }
 }
 
 // ============================================================================
@@ -691,6 +847,8 @@ function updateActiveModesUI() {
     styleModeButton($('modalEditModeButton'), isEdit(), { on: 'Bearbeitungsmodus verlassen', off: 'Bearbeitungsmodus aktivieren', iconOn: 'fa-lock-open', iconOff: 'fa-pen-ruler', color: 'bg-amber-500 text-white hover:bg-amber-600' });
     styleModeButton($('modalStaffModeButton'), isStaff(), { on: 'Personal Modus verlassen', off: 'Personal Modus aktivieren', iconOn: 'fa-user-shield', iconOff: 'fa-user-tie', color: 'bg-violet-600 text-white hover:bg-violet-700' });
     $('dataManagementSection').classList.toggle('hidden', !isEdit());
+    if (!isEdit() && selectMode) setSelectMode(false);
+    $('selectModeBtn').classList.toggle('hidden', !isEdit());
 
     const status = $('headerModeStatus');
     if (mode === 'view') status.classList.add('hidden');
@@ -799,33 +957,104 @@ function updateMainActionButtonsVisibility() {
 // ============================================================================
 // Drinks – filtering, sorting, rendering
 // ============================================================================
-function searchTerms() { return currentSearchQuery.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean); }
+/** Parses the search bar: comma separated terms; tokens starting with # are tag filters (prefix match). */
+function parseSearch() {
+    const terms = []; const tags = [];
+    for (const part of currentSearchQuery.split(',')) {
+        const p = part.trim().toLowerCase();
+        if (!p) continue;
+        if (p.includes('#')) {
+            for (const tok of p.split(/\s+/)) {
+                if (tok.startsWith('#')) { const t = tok.replace(/^#+/, ''); if (t) tags.push(t); }
+                else if (tok) terms.push(tok);
+            }
+        } else terms.push(p);
+    }
+    return { terms, tags };
+}
+function searchTerms() { return parseSearch().terms; }
 
-function drinkMatchesSearch(drink, terms) {
+function drinkMatchesSearch(drink, terms, tags = []) {
+    const dTags = drink.tags || [];
+    if (tags.length && !tags.every((t) => dTags.some((x) => x.startsWith(t)))) return false;
     if (!terms.length) return true;
-    const hay = [drink.name, drink.glass, drink.garnish, ...(drink.ingredients || []).map((i) => i?.item)].filter(Boolean).map((s) => String(s).toLowerCase());
+    const hay = [drink.name, drink.glass, drink.garnish, drink.notes, ...dTags, ...(drink.ingredients || []).map((i) => i?.item)].filter(Boolean).map((x) => String(x).toLowerCase());
     return terms.every((t) => hay.some((h) => h.includes(t)));
 }
 
+function passesFilters(id, d) {
+    const f = filters;
+    const tags = d.tags || [];
+    if (f.tags.length && (f.tagMode === 'any' ? !f.tags.some((t) => tags.includes(t)) : !f.tags.every((t) => tags.includes(t)))) return false;
+    if (f.glass && (d.glass || '').toLowerCase() !== f.glass.toLowerCase()) return false;
+    const items = (d.ingredients || []).map((i) => String(i?.item || '').toLowerCase());
+    if (f.include.length && !f.include.every((x) => items.includes(x.toLowerCase()))) return false;
+    if (f.exclude.length && f.exclude.some((x) => items.includes(x.toLowerCase()))) return false;
+    if (f.maxIngredients && items.length > f.maxIngredients) return false;
+    if (f.image === 'with' && !safeUrl(d.imageUrl)) return false;
+    if (f.image === 'without' && safeUrl(d.imageUrl)) return false;
+    const complete = !!(d.recipe && items.length);
+    if (f.completeness === 'complete' && !complete) return false;
+    if (f.completeness === 'incomplete' && complete) return false;
+    if (f.recent && !((d.updatedAt || d.createdAt || 0) > Date.now() - f.recent * 86400000)) return false;
+    return true;
+}
+function activeFilterCount() {
+    const f = filters;
+    return f.tags.length + (f.glass ? 1 : 0) + f.include.length + f.exclude.length + (f.maxIngredients ? 1 : 0)
+        + (f.image !== 'any' ? 1 : 0) + (f.completeness !== 'any' ? 1 : 0) + (f.recent ? 1 : 0);
+}
+
 function getVisibleDrinks() {
-    const terms = searchTerms();
-    const acrossAll = prefs.searchAll && terms.length > 0;
+    const { terms, tags } = parseSearch();
+    const acrossAll = prefs.searchAll && (terms.length > 0 || tags.length > 0);
     const list = Object.entries(allDrinks).filter(([id, d]) => {
         if (!acrossAll && d.categoryId !== selectedCategoryId) return false;
         if (acrossAll && !allCategories[d.categoryId]) return false;
         if (currentFilterType !== 'Alles' && d.type !== currentFilterType) return false;
         if (favOnly && !me?.favorites?.[id]) return false;
-        return drinkMatchesSearch(d, terms);
+        if (!passesFilters(id, d)) return false;
+        return drinkMatchesSearch(d, terms, tags);
     });
     const fav = (id) => (me?.favorites?.[id] ? 1 : 0);
     const nameCmp = ([, a], [, b]) => (a.name || '').localeCompare(b.name || '', 'de', { sensitivity: 'base' });
     switch (prefs.sort) {
         case 'name-desc': list.sort((x, y) => nameCmp(y, x)); break;
         case 'newest': list.sort(([, a], [, b]) => (b.createdAt || 0) - (a.createdAt || 0) || nameCmp([, a], [, b])); break;
+        case 'updated': list.sort(([, a], [, b]) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0) || nameCmp([, a], [, b])); break;
         case 'favorites': list.sort((x, y) => fav(y[0]) - fav(x[0]) || nameCmp(x, y)); break;
+        case 'ingredients': list.sort(([, a], [, b]) => (a.ingredients || []).length - (b.ingredients || []).length || nameCmp([, a], [, b])); break;
         default: list.sort(nameCmp);
     }
     return { list, acrossAll };
+}
+
+// ---- Tags ----
+function allTagCounts() {
+    const counts = {};
+    for (const d of Object.values(allDrinks)) for (const t of d.tags || []) counts[t] = (counts[t] || 0) + 1;
+    for (const t of Object.keys(tagMeta)) if (!(t in counts)) counts[t] = 0;
+    return counts;
+}
+function normTag(v) {
+    const t = String(v || '').trim().replace(/^#+/, '').toLowerCase().replace(/\s+/g, '-');
+    return /^[\p{L}\p{N}_-]{1,30}$/u.test(t) ? t : null;
+}
+function tagChip(t, { removable = false, clickable = true, count = null } = {}) {
+    const c = tagMeta[t]?.color ? safeColor(tagMeta[t].color) : null;
+    const style = c ? `style="background:${c}1f;color:${c};box-shadow:inset 0 0 0 1px ${c}55"` : '';
+    const cls = c ? '' : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200';
+    const tag = clickable ? 'button type="button"' : 'span';
+    const end = clickable ? 'button' : 'span';
+    return `<${tag} data-tag="${esc(t)}" class="tag-chip chip ${cls} ${clickable ? 'hover:opacity-80' : ''}" ${style}>#${esc(t)}${count !== null ? `<span class="opacity-60">${count}</span>` : ''}${removable ? '<i class="fas fa-times ml-0.5 text-[10px]"></i>' : ''}</${end}>`;
+}
+function searchForTag(t) {
+    const v = `#${t}`;
+    $('searchInput').value = v; $('searchInputMobile').value = v;
+    currentSearchQuery = v;
+    closeTagSuggest();
+    filterAndRenderDrinks();
+    $('mainArea').scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function popupAllowedFor(drink) {
@@ -846,6 +1075,7 @@ function filterAndRenderDrinks() {
     const meta = $('categoryMeta');
     $('searchAllWrap').classList.toggle('hidden', !currentSearchQuery.trim());
     $('searchAllWrap').classList.toggle('flex', !!currentSearchQuery.trim());
+    renderActiveFilters();
 
     if (!selectedCategoryId || !allCategories[selectedCategoryId]) {
         title.textContent = Object.keys(allCategories).length ? 'Ordner wählen' : 'Keine Ordner';
@@ -868,19 +1098,24 @@ function filterAndRenderDrinks() {
         noDrinks.classList.remove('hidden');
         const q = currentSearchQuery.trim();
         if (q) noDrinks.innerHTML = `Keine Drinks für „${esc(q)}" gefunden.${!prefs.searchAll ? ' <button id="searchAllInline" class="font-semibold text-indigo-600 underline dark:text-zest-300">In allen Ordnern suchen</button>' : ''}`;
+        else if (activeFilterCount()) noDrinks.innerHTML = 'Kein Drink passt zu den Filtern. <button id="emptyResetFilters" class="font-semibold text-indigo-600 underline dark:text-zest-300">Filter zurücksetzen</button>';
         else if (favOnly) noDrinks.textContent = 'Keine Favoriten in diesem Ordner. Tippe auf den Stern eines Drinks, um ihn zu merken.';
         else if (isEdit()) noDrinks.innerHTML = 'Dieser Ordner ist leer. <button id="emptyAddDrink" class="font-semibold text-indigo-600 underline dark:text-zest-300">Ersten Drink anlegen</button>';
         else noDrinks.textContent = 'Dieser Ordner ist leer.';
         $('searchAllInline')?.addEventListener('click', () => { $('searchAllToggle').checked = true; prefs.searchAll = true; savePrefs(); filterAndRenderDrinks(); });
         $('emptyAddDrink')?.addEventListener('click', () => openDrinkModal(null, selectedCategoryId));
+        $('emptyResetFilters')?.addEventListener('click', () => { filters = emptyFilters(); filterAndRenderDrinks(); });
     } else noDrinks.classList.add('hidden');
 
     const frag = document.createDocumentFragment();
     list.forEach(([id, drink]) => frag.appendChild(prefs.view === 'list' ? buildDrinkRow(id, drink, acrossAll) : buildDrinkCard(id, drink, acrossAll)));
+    lastVisibleIds = list.map(([id]) => id);
+    updateBulkBar();
     container.appendChild(frag);
     updateMainActionButtonsVisibility();
 }
 
+let lastVisibleIds = [];
 function typePill(type) {
     const mock = type === 'Mocktail';
     return `<span class="chip ${mock ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-200'}">${esc(type)}</span>`;
@@ -907,7 +1142,23 @@ function favButton(id, extraCls = '') {
     return `<button data-id="${esc(id)}" class="fav-btn ${extraCls} flex h-9 w-9 items-center justify-center rounded-full ${on ? 'text-zest-500' : 'text-gray-400 hover:text-zest-500'}" aria-pressed="${on}" aria-label="${on ? 'Aus Favoriten entfernen' : 'Zu Favoriten'}"><i class="${on ? 'fas' : 'far'} fa-star"></i></button>`;
 }
 
+function selectBox(id) {
+    const on = selectedDrinks.has(id);
+    return `<span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${on ? 'bg-indigo-600 text-white' : 'border-2 border-gray-300 text-transparent dark:border-plum-600'}" aria-hidden="true"><i class="fas fa-check text-sm"></i></span>`;
+}
+
 function wireCard(el, id) {
+    el.querySelectorAll('.tag-chip').forEach((b) => b.addEventListener('click', (e) => {
+        if (selectMode) return; // in selection mode a click anywhere on the card toggles it
+        e.stopPropagation();
+        searchForTag(b.dataset.tag);
+    }));
+    if (selectMode) {
+        el.addEventListener('click', () => toggleSelected(id));
+        el.setAttribute('role', 'checkbox');
+        el.setAttribute('aria-checked', String(selectedDrinks.has(id)));
+        return;
+    }
     el.querySelector('.edit-drink-btn')?.addEventListener('click', () => openDrinkModal(id));
     el.querySelector('.duplicate-drink-btn')?.addEventListener('click', () => duplicateDrink(id));
     el.querySelector('.delete-drink-btn')?.addEventListener('click', () => handleDeleteDrink(id));
@@ -925,7 +1176,7 @@ function wireCard(el, id) {
 
 function buildDrinkCard(id, drink, showFolder) {
     const card = document.createElement('article');
-    card.className = 'drink-card flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200/70 dark:bg-plum-900 dark:ring-plum-800';
+    card.className = `drink-card flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200/70 dark:bg-plum-900 dark:ring-plum-800 ${selectMode ? 'cursor-pointer' : ''} ${selectedDrinks.has(id) ? 'is-selected' : ''}`;
     card.dataset.drinkId = id;
     const img = prefs.showImages && safeUrl(drink.imageUrl);
     const ingredients = drink.ingredients || [];
@@ -943,7 +1194,7 @@ function buildDrinkCard(id, drink, showFolder) {
                         ${showFolder ? `<span class="chip bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200"><i class="fas fa-folder"></i>${esc(allCategories[drink.categoryId]?.name || '')}</span>` : ''}
                     </div>
                 </div>
-                ${favButton(id, '-mr-2 -mt-1')}
+                ${selectMode ? selectBox(id) : favButton(id, '-mr-2 -mt-1')}
             </div>
             ${ingredients.length ? `
             <ul class="mb-3 space-y-0.5 text-sm text-gray-700 dark:text-gray-300">
@@ -951,11 +1202,12 @@ function buildDrinkCard(id, drink, showFolder) {
             </ul>` : ''}
             ${drink.recipe ? `<p class="${prefs.clampRecipe ? 'clamp-4' : ''} whitespace-pre-wrap text-sm text-gray-500 dark:text-gray-400">${esc(drink.recipe)}</p>` : ''}
             ${drink.garnish ? `<p class="mt-2 text-xs text-gray-500 dark:text-gray-400"><i class="fas fa-lemon mr-1 text-zest-500"></i>${esc(drink.garnish)}</p>` : ''}
+            ${(drink.tags || []).length ? `<div class="mt-3 flex flex-wrap gap-1">${drink.tags.map((t) => tagChip(t)).join('')}</div>` : ''}
             ${drink.notes ? `<p class="mt-2 rounded-lg bg-zest-300/15 px-2.5 py-1.5 text-xs text-gray-700 dark:text-zest-300"><i class="fas fa-note-sticky mr-1"></i>${esc(drink.notes)}</p>` : ''}
-            <div class="mt-auto flex flex-wrap items-center justify-end gap-1.5 pt-4">
+            ${selectMode ? '' : `<div class="mt-auto flex flex-wrap items-center justify-end gap-1.5 pt-4">
                 ${popup ? `<button class="open-recipe-btn btn btn-sm btn-ghost mr-auto" aria-label="Rezept öffnen"><i class="fas fa-up-right-and-down-left-from-center"></i><span class="hidden sm:inline">Öffnen</span></button>` : ''}
                 ${actions}
-            </div>
+            </div>`}
         </div>`;
     const im = card.querySelector('img');
     if (im) im.addEventListener('error', () => im.parentElement.remove(), { once: true });
@@ -965,19 +1217,19 @@ function buildDrinkCard(id, drink, showFolder) {
 
 function buildDrinkRow(id, drink, showFolder) {
     const row = document.createElement('article');
-    row.className = 'drink-card flex items-center gap-3 rounded-xl bg-white px-3 py-2.5 shadow-sm ring-1 ring-gray-200/70 dark:bg-plum-900 dark:ring-plum-800';
+    row.className = `drink-card flex items-center gap-3 rounded-xl bg-white px-3 py-2.5 shadow-sm ring-1 ring-gray-200/70 dark:bg-plum-900 dark:ring-plum-800 ${selectMode ? 'cursor-pointer' : ''} ${selectedDrinks.has(id) ? 'is-selected' : ''}`;
     row.dataset.drinkId = id;
     const img = prefs.showImages && safeUrl(drink.imageUrl);
     row.innerHTML = `
         ${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="h-11 w-11 flex-shrink-0 rounded-lg object-cover">` : `<span class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-lg dark:bg-plum-800">${esc((drink.symbols || '').slice(0, 2)) || '🍸'}</span>`}
         <div class="min-w-0 flex-1 cursor-pointer open-recipe-area">
             <div class="flex items-center gap-2"><h3 class="truncate font-semibold text-gray-900 dark:text-white">${esc(drink.name)}</h3>${typePill(drink.type)}${showFolder ? `<span class="chip hidden bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 sm:inline-flex">${esc(allCategories[drink.categoryId]?.name || '')}</span>` : ''}</div>
-            <p class="truncate text-xs text-gray-500 dark:text-gray-400">${esc((drink.ingredients || []).map((i) => i.item).join(', ') || 'Keine Zutaten')}</p>
+            <p class="truncate text-xs text-gray-500 dark:text-gray-400">${esc((drink.ingredients || []).map((i) => i.item).join(', ') || 'Keine Zutaten')}${(drink.tags || []).length ? ` · ${drink.tags.map((t) => `#${esc(t)}`).join(' ')}` : ''}</p>
         </div>
-        <div class="flex flex-shrink-0 items-center gap-1">${drinkActionButtons(id, drink)}${favButton(id)}</div>`;
+        <div class="flex flex-shrink-0 items-center gap-1">${selectMode ? selectBox(id) : drinkActionButtons(id, drink) + favButton(id)}</div>`;
     const im = row.querySelector('img');
     if (im) im.addEventListener('error', () => { im.replaceWith(Object.assign(document.createElement('span'), { className: 'flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-lg dark:bg-plum-800', textContent: '🍸' })); }, { once: true });
-    row.querySelector('.open-recipe-area').addEventListener('click', () => { if (popupAllowedFor(drink)) showRecipePopup(id); });
+    row.querySelector('.open-recipe-area').addEventListener('click', () => { if (!selectMode && popupAllowedFor(drink)) showRecipePopup(id); });
     wireCard(row, id);
     return row;
 }
@@ -989,7 +1241,29 @@ function handleDrinkCardDoubleClick(drinkId) {
 
 // ----- search / filter / sort / view controls -----
 let searchDebounce = null;
+function closeTagSuggest() { document.querySelectorAll('.tag-suggest').forEach((b) => b.classList.add('hidden')); }
+function renderTagSuggest(input) {
+    const box = input.parentElement.querySelector('.tag-suggest');
+    const m = input.value.slice(0, input.selectionStart ?? input.value.length).match(/#([^\s,#]*)$/);
+    if (!m) { box.classList.add('hidden'); return; }
+    const q = m[1].toLowerCase();
+    const counts = allTagCounts();
+    const list = Object.keys(counts).filter((t) => t.startsWith(q)).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b)).slice(0, 12);
+    if (!list.length) { box.classList.add('hidden'); return; }
+    box.innerHTML = list.map((t) => `<button type="button" data-t="${esc(t)}" class="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-indigo-50 dark:hover:bg-plum-700"><span>#${esc(t)}</span><span class="text-xs text-gray-400">${counts[t]}</span></button>`).join('');
+    box.classList.remove('hidden');
+    box.querySelectorAll('button').forEach((b) => b.addEventListener('mousedown', (ev) => {
+        ev.preventDefault();
+        const before = input.value.slice(0, input.selectionStart ?? input.value.length).replace(/#([^\s,#]*)$/, `#${b.dataset.t} `);
+        const after = input.value.slice(input.selectionStart ?? input.value.length);
+        input.value = before + after;
+        input.dispatchEvent(new Event('input'));
+        box.classList.add('hidden');
+        input.focus();
+    }));
+}
 function handleSearchInput(e) {
+    renderTagSuggest(e.target);
     currentSearchQuery = e.target.value;
     if (e.target.id === 'searchInput') $('searchInputMobile').value = currentSearchQuery;
     else $('searchInput').value = currentSearchQuery;
@@ -998,6 +1272,10 @@ function handleSearchInput(e) {
 }
 $('searchInput').addEventListener('input', handleSearchInput);
 $('searchInputMobile').addEventListener('input', handleSearchInput);
+['searchInput', 'searchInputMobile'].forEach((id) => {
+    $(id).addEventListener('blur', () => setTimeout(closeTagSuggest, 150));
+    $(id).addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeTagSuggest(); } });
+});
 $('searchAllToggle').checked = prefs.searchAll;
 $('searchAllToggle').addEventListener('change', (e) => { prefs.searchAll = e.target.checked; savePrefs(); filterAndRenderDrinks(); });
 
@@ -1011,7 +1289,7 @@ $('favFilterBtn').addEventListener('click', () => {
     const b = $('favFilterBtn');
     b.setAttribute('aria-pressed', String(favOnly));
     b.className = `btn btn-sm ${favOnly ? 'bg-zest-400 text-plum-950 hover:bg-zest-500' : 'btn-secondary'}`;
-    b.innerHTML = `<i class="${favOnly ? 'fas' : 'far'} fa-star"></i> Favoriten`;
+    b.innerHTML = `<i class="${favOnly ? 'fas' : 'far'} fa-star"></i><span class="hidden sm:inline">Favoriten</span>`;
     filterAndRenderDrinks();
 });
 $('sortSelect').value = prefs.sort;
@@ -1298,11 +1576,13 @@ function openDrinkModal(id = null, catIdForNew = null, isStaffNewRecipe = false,
         $('drinkGlass').value = drink.glass || '';
         $('drinkGarnish').value = drink.garnish || '';
         $('drinkNotes').value = drink.notes || '';
+        setFormTags(drink.tags || []);
         catId = drink.categoryId;
         (drink.ingredients || []).length ? drink.ingredients.forEach((i) => addIngredientField(i.item, i.amount)) : addIngredientField();
         $('drinkCategory').disabled = false;
     } else {
         addIngredientField();
+        setFormTags([]);
         $('emptyFieldsToggleContainer').classList.remove('hidden');
         $('emptyFieldsToggleContainer').classList.add('flex');
         $('allowEmptyFieldsToggle').checked = false;
@@ -1360,7 +1640,9 @@ $('drinkForm').addEventListener('submit', async (e) => {
         glass: $('drinkGlass').value.trim(),
         garnish: $('drinkGarnish').value.trim(),
         notes: $('drinkNotes').value.trim(),
+        tags: commitPendingTag() ? [...formTags] : null,
     };
+    if (!drink.tags) return;
     const actionMode = staffTarget && isStaff() ? 'staff' : 'edit';
     await withBusy($('drinkSaveBtn'), async () => {
         const res = await act('saveDrink', { id: id || undefined, drink, quick }, { modeOverride: actionMode });
@@ -1670,10 +1952,22 @@ $('ingredientListContainer').addEventListener('change', async (e) => {
 // ============================================================================
 // Profile
 // ============================================================================
-const PERM_LABELS = {
-    editMode: 'Bearbeitungsmodus', staffMode: 'Personal Modus', manageUsers: 'Benutzer verwalten',
-    disableUsers: 'Benutzer sperren', deleteUsers: 'Benutzer löschen', admin: 'Administrator',
-};
+const PERM_DEFS = [
+    ['editMode', 'Bearbeitungsmodus', 'Ordner, Drinks und Zutaten verwalten, Massenbearbeitung.'],
+    ['staffMode', 'Personal Modus', 'Aktionen nach den Ordner-Einstellungen.'],
+    ['manageTags', 'Tags verwalten', 'Tags umbenennen, zusammenführen, löschen und einfärben.'],
+    ['manageUsers', 'Benutzer verwalten', 'Benutzer sehen, Konten anlegen und Rollen vergeben.'],
+    ['disableUsers', 'Benutzer sperren', 'Sperren, entsperren und Sitzungen beenden.'],
+    ['deleteUsers', 'Benutzer löschen', 'Konten endgültig löschen.'],
+    ['resetPasswords', 'Passwörter festlegen', 'Neue Passwörter für andere Benutzer setzen.'],
+    ['manageRoles', 'Rollen verwalten', 'Rollen unterhalb der eigenen erstellen und bearbeiten – nur mit eigenen Rechten.'],
+    ['manageSettings', 'App-Einstellungen', 'Registrierung, Wartungsmodus, Ankündigungen, Sicherheit.'],
+    ['viewAudit', 'Protokoll einsehen', 'Wer hat wann was geändert.'],
+    ['exportData', 'Daten exportieren', 'Sicherung als JSON herunterladen.'],
+    ['importData', 'Daten importieren', 'Sicherungen zusammenführen (überschreibt nie).'],
+    ['admin', 'Administrator', 'Alle Rechte, ohne Einschränkungen durch die Rangfolge.'],
+];
+const PERM_LABELS = Object.fromEntries(PERM_DEFS.map(([k, l]) => [k, l]));
 
 function openProfile() {
     if (!me) return;
@@ -1689,7 +1983,11 @@ function openProfile() {
     openModal($('profileModal'));
 }
 $('profileVerifyBtn').addEventListener('click', () => resendVerification($('profileVerifyBtn')));
-$('profileLogoutBtn').addEventListener('click', () => logout());
+$('profileRevokeBtn').addEventListener('click', async () => {
+    if (!(await showConfirm('Du wirst auf allen Geräten abgemeldet – auch auf diesem.', { title: 'Überall abmelden?', confirmLabel: 'Abmelden' }))) return;
+    try { await api('/api/me', { method: 'POST', body: { action: 'revokeMySessions' } }); } catch (e) { return toast(e.message, 'error'); }
+    await logout();
+});
 
 $('profileNameForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1710,7 +2008,8 @@ $('passwordForm').addEventListener('submit', async (e) => {
     const cur = $('pwCurrent').value;
     const nw = $('pwNew').value;
     if (!cur) return toast('Bitte aktuelles Passwort eingeben.', 'error');
-    if (nw.length < 8) return toast('Das neue Passwort muss mindestens 8 Zeichen lang sein.', 'error');
+    const min = serverSettings.minPasswordLength || 8;
+    if (nw.length < min) return toast(`Das neue Passwort muss mindestens ${min} Zeichen lang sein.`, 'error');
     if (nw !== $('pwNew2').value) return toast('Die neuen Passwörter stimmen nicht überein.', 'error');
     await withBusy(e.submitter, async () => {
         try {
@@ -1745,13 +2044,27 @@ function assignableRoles() {
     return adminData.roles.filter((r) => !roleIsAdmin(r) && r.index < myRoleIndex());
 }
 
+const USER_PERM_KEYS = ['admin', 'manageUsers', 'disableUsers', 'deleteUsers', 'resetPasswords'];
+function canManageRoleClient(r) {
+    if (perm('admin')) return true;
+    if (!perm('manageRoles') || !r) return false;
+    return r.id !== me.role?.id && !roleIsAdmin(r) && r.index < myRoleIndex();
+}
 async function openUsersPanel() {
-    if (!(perm('admin') || perm('manageUsers') || perm('disableUsers') || perm('deleteUsers'))) return;
-    document.querySelector('[data-tab="audit"]').classList.toggle('hidden', !perm('admin'));
-    document.querySelector('[data-tab="data"]').classList.toggle('hidden', !(perm('admin') || perm('editMode')));
-    $('importBox').classList.toggle('hidden', !perm('admin'));
+    if (!hasPanelAccess()) return;
+    const tabs = {
+        users: USER_PERM_KEYS.some(perm),
+        roles: true,
+        settings: perm('manageSettings'),
+        audit: perm('viewAudit'),
+        data: perm('exportData') || perm('importData'),
+    };
+    Object.entries(tabs).forEach(([t, v]) => document.querySelector(`#usersModal [data-tab="${t}"]`).classList.toggle('hidden', !v));
+    if (!tabs[activeTab]) activeTab = Object.keys(tabs).find((t) => tabs[t]);
+    $('exportBox').classList.toggle('hidden', !perm('exportData'));
+    $('importBox').classList.toggle('hidden', !perm('importData'));
     $('createUserBtn').classList.toggle('hidden', !perm('manageUsers'));
-    $('createRoleBtn').classList.toggle('hidden', !perm('admin'));
+    $('createRoleBtn').classList.toggle('hidden', !(perm('admin') || perm('manageRoles')));
     openModal($('usersModal'));
     switchTab(activeTab);
     await loadAdminData();
@@ -1786,14 +2099,73 @@ function renderAdmin() {
     rf.value = keep || '';
     renderUsersList();
     renderRolesList();
-    // settings
-    $('setRegistration').checked = !!adminData.settings.registrationEnabled;
-    $('setRegistration').disabled = !perm('manageUsers');
-    $('setVerification').checked = !!adminData.settings.requireEmailVerification;
-    $('setVerification').disabled = !perm('admin');
-    const s = adminData.stats || {};
-    $('statsGrid').innerHTML = [['Benutzer', s.users, 'fa-users'], ['Ordner', s.categories, 'fa-folder'], ['Drinks', s.drinks, 'fa-martini-glass-citrus'], ['Zutaten', s.ingredients, 'fa-lemon']]
+    const st = adminData.stats || {};
+    $('statsGrid').innerHTML = [['Benutzer', st.users, 'fa-users'], ['Ordner', st.categories, 'fa-folder'], ['Drinks', st.drinks, 'fa-martini-glass-citrus'], ['Zutaten', st.ingredients, 'fa-lemon']]
+        .filter(([, v]) => v !== null && v !== undefined)
         .map(([l, v, i]) => `<div class="rounded-xl bg-gray-50 p-4 dark:bg-plum-800/60"><i class="fas ${i} text-indigo-500"></i><p class="mt-2 font-display text-2xl font-bold">${Number(v) || 0}</p><p class="hint">${l}</p></div>`).join('');
+    if (perm('manageSettings')) renderAppSettings();
+}
+
+// ---- App settings (manageSettings) ----
+function renderAppSettings() {
+    const s = adminData.settings;
+    const toggle = (key, title, hint) => `
+        <label class="flex items-center justify-between gap-4 py-2">
+            <span><span class="block text-sm font-semibold">${title}</span><span class="hint">${hint}</span></span>
+            <input type="checkbox" class="check flex-shrink-0" data-set="${key}" ${s[key] ? 'checked' : ''}>
+        </label>`;
+    const card = (title, icon, inner) => `<section class="rounded-xl border border-gray-100 p-4 dark:border-plum-800"><p class="mb-2 flex items-center gap-2 font-display text-base font-bold"><i class="fas ${icon} text-indigo-500"></i>${title}</p>${inner}</section>`;
+    $('appSettingsForm').innerHTML = [
+        card('Allgemein', 'fa-store', `
+            <label class="label" for="setBarName">Name der Bar</label>
+            <div class="flex gap-2"><input id="setBarName" maxlength="40" class="input" value="${esc(s.barName)}" placeholder="Bar Organizer"><button class="btn btn-secondary" data-save="barName">Speichern</button></div>
+            <p class="hint mt-1">Erscheint im Kopfbereich und auf der Anmeldeseite.</p>`),
+        card('Ankündigung', 'fa-bullhorn', `
+            <textarea id="setAnnText" rows="2" maxlength="300" class="input" placeholder="z. B. Heute Abend Happy Hour – Mojitos zum halben Preis">${esc(s.announcementText)}</textarea>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+                <select id="setAnnLevel" class="input w-auto">${[['info', 'Info'], ['warning', 'Warnung'], ['success', 'Erfolg']].map(([v, l]) => `<option value="${v}" ${s.announcementLevel === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+                <button class="btn btn-secondary" data-save="announcement">Veröffentlichen</button>
+                ${s.announcementText ? '<button class="btn btn-ghost text-rose-600" data-save="announcementClear">Entfernen</button>' : ''}
+            </div>
+            <p class="hint mt-1">Wird allen angemeldeten Benutzern oben angezeigt, bis sie es ausblenden.</p>`),
+        card('Konten & Registrierung', 'fa-user-plus', `
+            ${toggle('registrationEnabled', 'Registrierung erlauben', 'Zeigt „Konto erstellen" auf der Anmeldeseite. Neue Konten erhalten die Standardrolle.')}
+            ${toggle('requireEmailVerification', 'E-Mail-Bestätigung verlangen', 'Unbestätigte Konten erhalten keinen Zugriff (Administratoren ausgenommen).')}
+            <label class="label mt-2" for="setDomains">Erlaubte E-Mail-Domains</label>
+            <div class="flex gap-2"><input id="setDomains" class="input" value="${esc((s.allowedEmailDomains || []).join(', '))}" placeholder="leer = alle, z. B. meinebar.de"><button class="btn btn-secondary" data-save="domains">Speichern</button></div>`),
+        card('Sicherheit', 'fa-shield-halved', `
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div><label class="label" for="setMinPw">Mindestlänge Passwort</label><select id="setMinPw" class="input">${[8, 10, 12, 14, 16, 20].map((n) => `<option ${s.minPasswordLength === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+                <div><label class="label" for="setSession">Automatisch abmelden nach</label><select id="setSession" class="input">${[[0, 'Nie'], [8, '8 Stunden'], [24, '1 Tag'], [72, '3 Tagen'], [168, '7 Tagen'], [720, '30 Tagen']].map(([v, l]) => `<option value="${v}" ${s.sessionMaxHours === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+            </div>
+            <p class="hint mt-1">Die Mindestlänge gilt für Registrierung, neue Konten und gesetzte Passwörter.</p>`),
+        card('Betrieb', 'fa-screwdriver-wrench', `
+            ${toggle('lockEditing', 'Bearbeitung sperren', 'Nur Administratoren können Daten ändern. Favoriten bleiben möglich.')}
+            ${toggle('maintenanceMode', 'Wartungsmodus', 'Nur Administratoren können die App benutzen.')}
+            <label class="label mt-2" for="setMaintMsg">Text im Wartungsmodus</label>
+            <div class="flex gap-2"><input id="setMaintMsg" maxlength="300" class="input" value="${esc(s.maintenanceMessage)}" placeholder="Die App wird gerade gewartet."><button class="btn btn-secondary" data-save="maintMsg">Speichern</button></div>`),
+        card('Protokoll', 'fa-clipboard-list', `
+            ${toggle('auditDataActions', 'Datenänderungen protokollieren', 'Löschen, Import, Massenaktionen usw. Benutzer- und Rollenänderungen werden immer protokolliert.')}
+            <label class="label mt-2" for="setAuditLimit">Maximale Einträge</label>
+            <select id="setAuditLimit" class="input w-auto">${[50, 100].map((n) => `<option ${s.auditLimit === n ? 'selected' : ''}>${n}</option>`).join('')}</select>
+            <p class="hint mt-1">Ältere Einträge werden automatisch gelöscht.</p>`),
+    ].join('');
+
+    const form = $('appSettingsForm');
+    const save = async (settings, btn, msg = 'Gespeichert.') => { if (await adminAct({ action: 'updateSettings', settings }, btn)) toast(msg, 'success'); };
+    form.querySelectorAll('[data-set]').forEach((c) => c.addEventListener('change', async () => {
+        const k = c.dataset.set;
+        if (k === 'maintenanceMode' && c.checked && !(await showConfirm('Alle Benutzer ohne Adminrechte verlieren sofort den Zugriff.', { title: 'Wartungsmodus aktivieren?', confirmLabel: 'Aktivieren' }))) { c.checked = false; return; }
+        save({ [k]: c.checked });
+    }));
+    form.querySelector('[data-save="barName"]').addEventListener('click', (e) => save({ barName: $('setBarName').value.trim() }, e.currentTarget));
+    form.querySelector('[data-save="announcement"]').addEventListener('click', (e) => save({ announcementText: $('setAnnText').value.trim(), announcementLevel: $('setAnnLevel').value }, e.currentTarget, 'Ankündigung veröffentlicht.'));
+    form.querySelector('[data-save="announcementClear"]')?.addEventListener('click', (e) => save({ announcementText: '' }, e.currentTarget, 'Ankündigung entfernt.'));
+    form.querySelector('[data-save="domains"]').addEventListener('click', (e) => save({ allowedEmailDomains: $('setDomains').value }, e.currentTarget));
+    form.querySelector('[data-save="maintMsg"]').addEventListener('click', (e) => save({ maintenanceMessage: $('setMaintMsg').value.trim() }, e.currentTarget));
+    $('setMinPw').addEventListener('change', (e) => save({ minPasswordLength: Number(e.target.value) }));
+    $('setSession').addEventListener('change', (e) => save({ sessionMaxHours: Number(e.target.value) }));
+    $('setAuditLimit').addEventListener('change', (e) => save({ auditLimit: Number(e.target.value) }));
 }
 $('userSearchInput').addEventListener('input', renderUsersList);
 $('userRoleFilter').addEventListener('change', renderUsersList);
@@ -1817,12 +2189,13 @@ function renderUsersList() {
         const actOk = canActOn(u);
         const disabled = u.disabled || u.authDisabled;
         const row = document.createElement('div');
-        row.className = `flex flex-col gap-3 rounded-xl border border-gray-100 p-3 dark:border-plum-800 sm:flex-row sm:items-center ${disabled ? 'opacity-70' : ''}`;
+        row.className = `flex flex-col gap-3 rounded-xl border border-gray-100 p-3 dark:border-plum-800 md:flex-row md:items-center ${disabled ? 'opacity-70' : ''}`;
         const badges = [
             u.uid === me.uid ? '<span class="chip bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-200">Du</span>' : '',
             role ? roleChip(role) : '<span class="chip bg-gray-100 text-gray-600 dark:bg-plum-800 dark:text-gray-300">Ohne Profil</span>',
             disabled ? '<span class="chip bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-200"><i class="fas fa-ban"></i>Gesperrt</span>' : '',
             u.emailVerified === false ? '<span class="chip bg-zest-300/30 text-amber-800 dark:text-zest-300" title="E-Mail nicht bestätigt"><i class="fas fa-envelope"></i>unbestätigt</span>' : '',
+            u.forcePasswordChange ? '<span class="chip bg-gray-100 text-gray-700 dark:bg-plum-800 dark:text-gray-200"><i class="fas fa-key"></i>Passwortwechsel offen</span>' : '',
         ].join('');
         row.innerHTML = `
             <div class="flex min-w-0 flex-1 items-center gap-3">
@@ -1847,21 +2220,21 @@ function renderUsersList() {
             sel.addEventListener('change', () => changeUserRole(u, sel.value, sel));
             ctr.appendChild(sel);
         }
-        if (actOk && perm('disableUsers') && (u.hasProfile || perm('admin'))) {
+        const iconBtn = (icon, label, cls, fn) => {
             const b = document.createElement('button');
-            b.className = `btn btn-sm ${disabled ? 'btn-success' : 'btn-secondary'}`;
-            b.innerHTML = disabled ? '<i class="fas fa-lock-open"></i> Entsperren' : '<i class="fas fa-ban"></i> Sperren';
-            b.addEventListener('click', () => toggleUserDisabled(u, !disabled, b));
+            b.className = `btn btn-sm ${cls}`;
+            b.title = label;
+            b.setAttribute('aria-label', label);
+            b.innerHTML = `<i class="fas ${icon}"></i><span class="hidden lg:inline">${label}</span>`;
+            b.addEventListener('click', () => fn(b));
             ctr.appendChild(b);
+        };
+        if (actOk && perm('disableUsers')) {
+            iconBtn(disabled ? 'fa-lock-open' : 'fa-ban', disabled ? 'Entsperren' : 'Sperren', disabled ? 'btn-success' : 'btn-secondary', (b) => toggleUserDisabled(u, !disabled, b));
+            if (u.hasProfile && !disabled) iconBtn('fa-right-from-bracket', 'Abmelden', 'btn-secondary', (b) => revokeUser(u, b));
         }
-        if (actOk && perm('deleteUsers') && (u.hasProfile || perm('admin'))) {
-            const b = document.createElement('button');
-            b.className = 'btn btn-sm btn-ghost text-rose-600 dark:text-rose-400';
-            b.setAttribute('aria-label', 'Benutzer löschen');
-            b.innerHTML = '<i class="fas fa-trash"></i>';
-            b.addEventListener('click', () => deleteUser(u));
-            ctr.appendChild(b);
-        }
+        if (actOk && perm('resetPasswords')) iconBtn('fa-key', 'Passwort', 'btn-secondary', () => openSetPassword(u));
+        if (actOk && perm('deleteUsers')) iconBtn('fa-trash', 'Löschen', 'btn-ghost text-rose-600 dark:text-rose-400', () => deleteUser(u));
         if (!ctr.children.length && u.uid !== me.uid) ctr.innerHTML = '<span class="hint"><i class="fas fa-lock mr-1"></i>Keine Rechte</span>';
         box.appendChild(row);
     });
@@ -1891,6 +2264,42 @@ async function toggleUserDisabled(u, disabled, btn) {
     if (disabled && !(await showConfirm(`${u.displayName || u.email} kann sich danach nicht mehr anmelden.`, { title: 'Benutzer sperren?', confirmLabel: 'Sperren' }))) return;
     if (await adminAct({ action: 'setUserDisabled', uid: u.uid, disabled }, btn)) toast(disabled ? 'Benutzer gesperrt.' : 'Benutzer entsperrt.', 'success');
 }
+async function revokeUser(u, btn) {
+    if (!(await showConfirm(`${u.displayName || u.email} wird auf allen Geräten abgemeldet.`, { title: 'Abmelden erzwingen?', confirmLabel: 'Abmelden', danger: false }))) return;
+    if (await adminAct({ action: 'revokeSessions', uid: u.uid }, btn)) toast('Benutzer abgemeldet.', 'success');
+}
+function genPassword() {
+    const len = Math.max(12, adminData?.settings?.minPasswordLength || serverSettings.minPasswordLength || 12);
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_!?';
+    const out = [];
+    const rnd = crypto.getRandomValues(new Uint32Array(len));
+    for (let i = 0; i < len; i++) out.push(chars[rnd[i] % chars.length]);
+    return out.join('');
+}
+async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); toast('Kopiert.', 'success'); } catch { toast('Kopieren nicht möglich – bitte manuell markieren.', 'error'); }
+}
+function openSetPassword(u) {
+    $('setPwForm').reset();
+    $('setPwUid').value = u.uid;
+    $('setPwWho').textContent = `Neues Passwort für ${u.displayName || u.email} (${u.email})`;
+    $('setPwInput').value = genPassword();
+    $('setPwForce').checked = true;
+    openModal($('setPwModal'));
+}
+$('setPwGen').addEventListener('click', () => { $('setPwInput').value = genPassword(); });
+$('setPwCopy').addEventListener('click', () => copyText($('setPwInput').value));
+$('setPwForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const pw = $('setPwInput').value;
+    const min = adminData?.settings?.minPasswordLength || 8;
+    if (pw.length < min) return toast(`Mindestens ${min} Zeichen.`, 'error');
+    if (await adminAct({ action: 'setPassword', uid: $('setPwUid').value, password: pw, forceChange: $('setPwForce').checked }, e.submitter)) {
+        closeModal($('setPwModal'), true);
+        toast('Passwort gesetzt. Gib es der Person sicher weiter.', 'success');
+    }
+});
+
 async function deleteUser(u) {
     const ok = await showConfirm(`Das Konto von ${u.email} wird endgültig gelöscht. Von dieser Person angelegte Drinks bleiben erhalten.`, { title: 'Benutzer löschen?', confirmLabel: 'Endgültig löschen', typeToConfirm: 'LÖSCHEN' });
     if (ok && await adminAct({ action: 'deleteUser', uid: u.uid })) toast('Benutzer gelöscht.', 'success');
@@ -1904,18 +2313,25 @@ $('createUserBtn').addEventListener('click', () => {
     assignableRoles().slice().sort((a, b) => a.index - b.index).forEach((r) => sel.add(new Option(r.name, r.id)));
     sel.value = 'default';
     if (!sel.value && sel.options.length) sel.selectedIndex = 0;
+    $('cuPassword').value = genPassword();
+    $('cuForce').checked = true;
+    $('cuPwHint').textContent = `Mindestens ${adminData?.settings?.minPasswordLength || 8} Zeichen.`;
     openModal($('createUserModal'));
 });
+$('cuGenBtn').addEventListener('click', () => { $('cuPassword').value = genPassword(); });
+$('cuCopyBtn').addEventListener('click', () => copyText(`E-Mail: ${$('cuEmail').value.trim()}\nPasswort: ${$('cuPassword').value}`));
 $('createUserForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const displayName = $('cuName').value.trim();
     const email = $('cuEmail').value.trim();
+    const password = $('cuPassword').value;
     if (!displayName || !email) return toast('Bitte Name und E-Mail angeben.', 'error');
-    const r = await adminAct({ action: 'createUser', displayName, email, roleId: $('cuRole').value }, e.submitter);
+    const min = adminData?.settings?.minPasswordLength || 8;
+    if (password.length < min) return toast(`Das Passwort muss mindestens ${min} Zeichen lang sein.`, 'error');
+    const r = await adminAct({ action: 'createUser', displayName, email, password, roleId: $('cuRole').value, forceChange: $('cuForce').checked, emailVerified: $('cuVerified').checked }, e.submitter);
     if (r) {
         closeModal($('createUserModal'), true);
-        try { await sendPasswordResetEmail(auth, email); toast(`Konto angelegt. Einladung an ${email} gesendet.`, 'success'); }
-        catch { toast('Konto angelegt, aber die Einladungs-E-Mail konnte nicht gesendet werden. Die Person kann „Passwort vergessen" nutzen.', 'info'); }
+        showCustomAlert(`Konto für ${email} angelegt. Gib der Person die Zugangsdaten weiter${$('cuForce').checked ? ' – sie muss das Passwort bei der ersten Anmeldung ändern' : ''}.`);
     }
 });
 
@@ -1925,7 +2341,7 @@ function renderRolesList() {
     const counts = {};
     adminData.users.forEach((u) => { if (u.hasProfile) counts[u.roleId] = (counts[u.roleId] || 0) + 1; });
     const nonDefault = adminData.roles.filter((r) => r.id !== 'default').length;
-    $('createRoleBtn').disabled = nonDefault >= 10;
+    $('createRoleBtn').disabled = nonDefault >= 10 || (!perm('admin') && myRoleIndex() <= 1);
     $('createRoleBtn').title = nonDefault >= 10 ? 'Maximal 10 Rollen' : '';
     box.innerHTML = '';
     adminData.roles.slice().sort((a, b) => b.index - a.index).forEach((r) => {
@@ -1938,7 +2354,7 @@ function renderRolesList() {
                 <div class="flex flex-wrap items-center gap-2">${roleChip(r)}${r.id === 'default' ? '<span class="hint">Standardrolle für neue Konten</span>' : ''}<span class="hint">${counts[r.id] || 0} Benutzer</span></div>
                 <div class="mt-1.5 flex flex-wrap gap-1">${perms.length ? perms.map((k) => `<span class="chip ${k === 'admin' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-200' : 'bg-gray-100 text-gray-700 dark:bg-plum-800 dark:text-gray-200'}">${PERM_LABELS[k]}</span>`).join('') : '<span class="hint">Nur Ansicht</span>'}</div>
             </div>`;
-        if (perm('admin')) {
+        if (canManageRoleClient(r)) {
             const b = document.createElement('button');
             b.className = 'btn btn-sm btn-secondary self-start sm:self-center';
             b.innerHTML = '<i class="fas fa-pen"></i> Bearbeiten';
@@ -1957,16 +2373,29 @@ function openRoleModal(role) {
     $('roleName').value = role?.name || '';
     $('roleColor').value = safeColor(role?.color || '#6366f1');
     const isDefault = role?.id === 'default';
+    const limited = !perm('admin');
     $('roleIndexWrap').classList.toggle('hidden', isDefault);
     const used = new Set(adminData.roles.filter((r) => r.id !== 'default' && r.id !== role?.id).map((r) => r.index));
     const sel = $('roleIndex');
     sel.innerHTML = '';
-    for (let i = 10; i >= 1; i--) { const o = new Option(`${i}${used.has(i) ? ' (vergeben)' : ''}`, String(i)); o.disabled = used.has(i); sel.add(o); }
+    for (let i = 10; i >= 1; i--) {
+        const blocked = used.has(i) || (limited && i >= myRoleIndex());
+        const o = new Option(`${i}${used.has(i) ? ' (vergeben)' : ''}`, String(i));
+        o.disabled = blocked;
+        sel.add(o);
+    }
     const firstFree = [...sel.options].find((o) => !o.disabled);
     sel.value = role && !isDefault ? String(role.index) : (firstFree?.value || '');
-    document.querySelectorAll('#roleForm [data-perm]').forEach((c) => { c.checked = !!role?.permissions?.[c.dataset.perm]; });
-    $('rolePermAdminRow').classList.toggle('hidden', isDefault);
+    $('rolePermList').innerHTML = PERM_DEFS.map(([k, label, hint]) => {
+        if (k === 'admin' && isDefault) return '';
+        const locked = limited && (k === 'admin' || !perm(k));
+        return `<label class="flex gap-3 ${locked ? 'opacity-50' : 'cursor-pointer'}">
+            <input type="checkbox" data-perm="${k}" class="check mt-0.5 flex-shrink-0" ${role?.permissions?.[k] ? 'checked' : ''} ${locked ? 'disabled' : ''}>
+            <span><span class="block text-sm font-medium ${k === 'admin' ? 'text-rose-600 dark:text-rose-400' : ''}">${label}</span><span class="hint">${hint}</span></span>
+        </label>`;
+    }).join('');
     $('roleDefaultHint').classList.toggle('hidden', !isDefault);
+    $('roleLimitHint').classList.toggle('hidden', !limited);
     $('roleDeleteBtn').classList.toggle('hidden', !role || isDefault);
     openModal($('roleModal'));
 }
@@ -1988,30 +2417,33 @@ $('roleDeleteBtn').addEventListener('click', async () => {
     if (ok && await adminAct({ action: 'deleteRole', id })) { closeModal($('roleModal'), true); toast('Rolle gelöscht.', 'success'); }
 });
 
-// ----- settings -----
-$('setRegistration').addEventListener('change', async (e) => {
-    if (!(await adminAct({ action: 'updateSettings', registrationEnabled: e.target.checked }))) return;
-    toast(e.target.checked ? 'Registrierung erlaubt.' : 'Registrierung deaktiviert.', 'success');
-});
-$('setVerification').addEventListener('change', async (e) => {
-    if (!(await adminAct({ action: 'updateSettings', requireEmailVerification: e.target.checked }))) return;
-    toast(e.target.checked ? 'E-Mail-Bestätigung ist jetzt Pflicht.' : 'E-Mail-Bestätigung ist optional.', 'success');
-});
-
 // ----- audit -----
 const AUDIT_LABELS = {
     register: 'Registriert', bootstrap_admin: 'Erster Admin', set_role: 'Rolle geändert', disable_user: 'Gesperrt', enable_user: 'Entsperrt',
     delete_user: 'Benutzer gelöscht', create_user: 'Benutzer angelegt', update_settings: 'Einstellungen', create_role: 'Rolle erstellt',
     update_role: 'Rolle geändert', delete_role: 'Rolle gelöscht', create_folder: 'Ordner erstellt', rename_folder: 'Ordner umbenannt',
     delete_folder: 'Ordner gelöscht', delete_drink: 'Drink gelöscht', restore_drink: 'Drink wiederhergestellt', purge_folder: 'Ordner geleert',
-    delete_ingredient: 'Zutat gelöscht', export: 'Export', import: 'Import',
+    delete_ingredient: 'Zutat gelöscht', export: 'Export', import: 'Import', bulk_drinks: 'Massenaktion', rename_tag: 'Tag umbenannt',
+    delete_tag: 'Tag gelöscht', revoke_sessions: 'Abgemeldet', set_password: 'Passwort gesetzt',
 };
 async function loadAudit() {
     const box = $('auditList');
     box.innerHTML = '<p class="py-8 text-center text-gray-500"><i class="fas fa-circle-notch fa-spin"></i></p>';
     try {
-        const { entries } = await api('/api/admin/audit');
-        box.innerHTML = entries.length ? '' : '<p class="py-8 text-center text-sm text-gray-500">Noch keine Einträge.</p>';
+        const { entries, limit } = await api('/api/admin/audit');
+        auditCache = entries;
+        $('auditInfo').textContent = `${entries.length} von max. ${limit} Einträgen`;
+        renderAudit();
+    } catch (e) { box.innerHTML = `<p class="py-8 text-center text-rose-600">${esc(e.message)}</p>`; }
+}
+let auditCache = [];
+$('auditSearch').addEventListener('input', renderAudit);
+function renderAudit() {
+    const box = $('auditList');
+    const q = $('auditSearch').value.trim().toLowerCase();
+    const entries = auditCache.filter((en) => !q || `${en.name} ${en.details} ${AUDIT_LABELS[en.action] || en.action}`.toLowerCase().includes(q));
+    box.innerHTML = entries.length ? '' : '<p class="py-8 text-center text-sm text-gray-500">Keine Einträge.</p>';
+    {
         entries.forEach((en) => {
             const row = document.createElement('div');
             row.className = 'flex flex-col gap-0.5 rounded-lg px-3 py-2 odd:bg-gray-50 dark:odd:bg-plum-800/40 sm:flex-row sm:items-baseline sm:gap-3';
@@ -2021,19 +2453,14 @@ async function loadAudit() {
                 <span class="text-xs text-gray-500">${esc(en.name || '')}</span>`;
             box.appendChild(row);
         });
-    } catch (e) { box.innerHTML = `<p class="py-8 text-center text-rose-600">${esc(e.message)}</p>`; }
+    }
 }
 
 // ----- export / import -----
 $('exportBtn').addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
     try {
         const data = await api('/api/export');
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `bar-organizer-${new Date().toISOString().slice(0, 10)}.json`;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        downloadJson(data, `bar-organizer-${new Date().toISOString().slice(0, 10)}.json`);
         toast('Sicherung heruntergeladen.', 'success');
     } catch (err) { toast(err.message, 'error'); }
 }));
@@ -2063,6 +2490,7 @@ document.addEventListener('keydown', (e) => {
         const top = modalStack[modalStack.length - 1];
         if (top) {
             if (top.id === 'confirmModal') resolveConfirm(false);
+            else if (top.id === 'choiceModal') { if (choiceResolver) choiceResolver(null); closeModal(top, true); }
             else closeModal(top);
             return;
         }
@@ -2074,8 +2502,348 @@ document.addEventListener('keydown', (e) => {
     if (e.key === '/') {
         e.preventDefault();
         (isMobile() ? $('searchInputMobile') : $('searchInput')).focus();
+    } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        openFilterModal();
     } else if ((e.key === 'n' || e.key === 'N') && isEdit()) {
         e.preventDefault();
         $('addDrinkButton').click();
     }
+});
+
+
+// ============================================================================
+// Tag input in the drink form
+// ============================================================================
+let formTags = [];
+function ensureTagHidden() {
+    let h = $('drinkTagsValue');
+    if (!h) { h = Object.assign(document.createElement('input'), { type: 'hidden', id: 'drinkTagsValue' }); $('drinkForm').appendChild(h); }
+    return h;
+}
+function setFormTags(list) { formTags = [...list]; renderFormTags(); }
+function renderFormTags() {
+    const box = $('drinkTagBox');
+    box.querySelectorAll('.tag-chip').forEach((c) => c.remove());
+    const input = $('drinkTagInput');
+    formTags.forEach((t) => input.insertAdjacentHTML('beforebegin', tagChip(t, { removable: true })));
+    box.querySelectorAll('.tag-chip').forEach((c) => c.addEventListener('click', () => { formTags = formTags.filter((x) => x !== c.dataset.tag); renderFormTags(); }));
+    ensureTagHidden().value = JSON.stringify(formTags);
+    renderFormTagSuggest();
+}
+function renderFormTagSuggest() {
+    const q = normTag($('drinkTagInput').value) || '';
+    const counts = allTagCounts();
+    const list = Object.keys(counts).filter((t) => !formTags.includes(t) && (!q || t.startsWith(q))).sort((a, b) => counts[b] - counts[a]).slice(0, 10);
+    $('drinkTagSuggest').innerHTML = list.map((t) => tagChip(t)).join('');
+    $('drinkTagSuggest').querySelectorAll('.tag-chip').forEach((c) => c.addEventListener('click', () => { addFormTag(c.dataset.tag); $('drinkTagInput').value = ''; renderFormTagSuggest(); }));
+}
+function addFormTag(raw) {
+    const t = normTag(raw);
+    if (!t) { if (String(raw).trim()) toast('Tags: 1–30 Zeichen, nur Buchstaben, Zahlen, - und _.', 'error'); return false; }
+    if (formTags.includes(t)) return true;
+    if (formTags.length >= 15) { toast('Maximal 15 Tags pro Drink.', 'error'); return false; }
+    formTags.push(t); renderFormTags();
+    return true;
+}
+/** Adds whatever is still typed in the tag field. Returns false if it was invalid. */
+function commitPendingTag() {
+    const v = $('drinkTagInput').value.trim();
+    if (!v) return true;
+    if (!addFormTag(v)) return false;
+    $('drinkTagInput').value = '';
+    return true;
+}
+$('drinkTagInput').addEventListener('keydown', (e) => {
+    const input = e.target;
+    if (e.key === 'Enter' || e.key === ',' || (e.key === ' ' && input.value.trim())) {
+        e.preventDefault();
+        if (addFormTag(input.value)) input.value = '';
+        renderFormTagSuggest();
+    } else if (e.key === 'Backspace' && !input.value && formTags.length) {
+        formTags.pop(); renderFormTags();
+    }
+});
+$('drinkTagInput').addEventListener('input', renderFormTagSuggest);
+$('drinkTagBox').addEventListener('click', (e) => { if (e.target === $('drinkTagBox')) $('drinkTagInput').focus(); });
+
+// ============================================================================
+// Generic choice dialog (used for bulk actions & tag rename)
+// ============================================================================
+let choiceResolver = null;
+function showChoice({ title, html, okLabel = 'OK', read }) {
+    if (choiceResolver) choiceResolver(null);
+    $('choiceTitle').textContent = title;
+    $('choiceBody').innerHTML = html;
+    $('choiceOk').textContent = okLabel;
+    openModal($('choiceModal'));
+    return new Promise((resolve) => { choiceResolver = (v) => { choiceResolver = null; resolve(v); }; $('choiceForm')._read = read; });
+}
+$('choiceForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = $('choiceForm')._read ? $('choiceForm')._read($('choiceBody')) : true;
+    if (v === undefined) return; // invalid input, keep dialog open
+    const r = choiceResolver;
+    closeModal($('choiceModal'), true);
+    if (r) r(v);
+});
+// resolve pending choice with null when the dialog is dismissed
+$('choiceModal').querySelectorAll('.modal-close').forEach((b) => b.addEventListener('click', () => { if (choiceResolver) choiceResolver(null); }));
+$('choiceModal').addEventListener('click', (e) => { if (e.target === $('choiceModal') && choiceResolver) choiceResolver(null); });
+
+function folderOptions(excludeId = null) {
+    return sortedCategoryEntries().filter(([id]) => id !== excludeId).map(([id, c]) => `<option value="${esc(id)}">${esc(c.name)}</option>`).join('');
+}
+
+// ============================================================================
+// Filters
+// ============================================================================
+let filterDraft = null;
+$('openFilterBtn').addEventListener('click', openFilterModal);
+function openFilterModal() {
+    filterDraft = JSON.parse(JSON.stringify(filters));
+    renderFilterBody();
+    openModal($('filterModal'));
+}
+function segHtml(name, options, value) {
+    return `<div class="seg">${options.map(([v, l]) => `<button type="button" data-seg="${name}" data-v="${esc(v)}" class="seg-btn ${String(value) === String(v) ? 'is-active' : ''}">${l}</button>`).join('')}</div>`;
+}
+function renderFilterBody() {
+    const f = filterDraft;
+    const counts = allTagCounts();
+    const tags = Object.keys(counts).filter((t) => counts[t] > 0).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+    const glasses = [...new Set(Object.values(allDrinks).map((d) => (d.glass || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+    const ingNames = [...new Set([...Object.values(allIngredients).map((i) => i?.name), ...Object.values(allDrinks).flatMap((d) => (d.ingredients || []).map((i) => i?.item))].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+    const ingChips = (list, key) => list.map((n) => `<button type="button" data-rm="${key}" data-v="${esc(n)}" class="chip bg-gray-100 text-gray-700 dark:bg-plum-800 dark:text-gray-200">${esc(n)} <i class="fas fa-times text-[10px]"></i></button>`).join('');
+    const datalist = `<datalist id="filterIngList">${ingNames.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>`;
+    $('filterBody').innerHTML = `
+        ${datalist}
+        <div>
+            <div class="mb-2 flex items-center justify-between"><p class="label mb-0">Tags</p>${segHtml('tagMode', [['all', 'Alle'], ['any', 'Mind. einer']], f.tagMode)}</div>
+            <div class="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">${tags.length ? tags.map((t) => `<button type="button" data-ftag="${esc(t)}" class="chip ${f.tags.includes(t) ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-plum-800 dark:text-gray-200'}">#${esc(t)} <span class="opacity-60">${counts[t]}</span></button>`).join('') : '<span class="hint">Noch keine Tags vergeben.</span>'}</div>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div><label class="label" for="fGlass">Glas</label><select id="fGlass" class="input"><option value="">Egal</option>${glasses.map((g) => `<option ${f.glass === g ? 'selected' : ''}>${esc(g)}</option>`).join('')}</select></div>
+            <div><label class="label" for="fMax">Max. Zutaten</label><select id="fMax" class="input">${[[0, 'Egal'], [2, '2'], [3, '3'], [4, '4'], [5, '5'], [6, '6'], [8, '8']].map(([v, l]) => `<option value="${v}" ${f.maxIngredients === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+        </div>
+        <div>
+            <label class="label" for="fInclude">Enthält Zutat</label>
+            <div class="flex gap-2"><input id="fInclude" list="filterIngList" class="input" placeholder="z. B. Limettensaft"><button type="button" data-add="include" class="btn btn-secondary" aria-label="Hinzufügen"><i class="fas fa-plus"></i></button></div>
+            <div class="mt-2 flex flex-wrap gap-1.5">${ingChips(f.include, 'include')}</div>
+        </div>
+        <div>
+            <label class="label" for="fExclude">Ohne Zutat <span class="hint">(z. B. bei Allergien)</span></label>
+            <div class="flex gap-2"><input id="fExclude" list="filterIngList" class="input" placeholder="z. B. Nüsse"><button type="button" data-add="exclude" class="btn btn-secondary" aria-label="Hinzufügen"><i class="fas fa-plus"></i></button></div>
+            <div class="mt-2 flex flex-wrap gap-1.5">${ingChips(f.exclude, 'exclude')}</div>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div><p class="label">Bild</p>${segHtml('image', [['any', 'Egal'], ['with', 'Mit'], ['without', 'Ohne']], f.image)}</div>
+            <div><p class="label">Rezept</p>${segHtml('completeness', [['any', 'Egal'], ['complete', 'Vollständig'], ['incomplete', 'Lückenhaft']], f.completeness)}</div>
+        </div>
+        <div><p class="label">Neu oder geändert</p>${segHtml('recent', [[0, 'Egal'], [1, 'Heute'], [7, '7 Tage'], [30, '30 Tage']], f.recent)}</div>`;
+    const body = $('filterBody');
+    body.querySelectorAll('[data-ftag]').forEach((b) => b.addEventListener('click', () => {
+        const t = b.dataset.ftag;
+        f.tags = f.tags.includes(t) ? f.tags.filter((x) => x !== t) : [...f.tags, t];
+        renderFilterBody();
+    }));
+    body.querySelectorAll('[data-seg]').forEach((b) => b.addEventListener('click', () => {
+        const k = b.dataset.seg;
+        f[k] = (k === 'recent') ? Number(b.dataset.v) : b.dataset.v;
+        renderFilterBody();
+    }));
+    body.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => { f[b.dataset.rm] = f[b.dataset.rm].filter((x) => x !== b.dataset.v); renderFilterBody(); }));
+    const addIng = (key) => {
+        const input = key === 'include' ? $('fInclude') : $('fExclude');
+        const v = input.value.trim();
+        if (v && !f[key].some((x) => x.toLowerCase() === v.toLowerCase())) f[key].push(v);
+        renderFilterBody();
+    };
+    body.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', () => addIng(b.dataset.add)));
+    ['fInclude', 'fExclude'].forEach((id) => $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addIng(id === 'fInclude' ? 'include' : 'exclude'); } }));
+    $('fGlass').addEventListener('change', (e) => { f.glass = e.target.value; });
+    $('fMax').addEventListener('change', (e) => { f.maxIngredients = Number(e.target.value); });
+}
+$('filterApplyBtn').addEventListener('click', () => { filters = filterDraft; closeModal($('filterModal'), true); filterAndRenderDrinks(); });
+$('filterResetBtn').addEventListener('click', () => { filterDraft = emptyFilters(); renderFilterBody(); });
+
+function renderActiveFilters() {
+    const box = $('activeFilters');
+    const f = filters;
+    const n = activeFilterCount();
+    $('filterCount').textContent = n;
+    $('filterCount').classList.toggle('hidden', !n);
+    const chips = [];
+    const chip = (label, onRemove) => chips.push({ label, onRemove });
+    f.tags.forEach((t) => chip(`#${t}`, () => { f.tags = f.tags.filter((x) => x !== t); }));
+    if (f.tags.length > 1) chip(f.tagMode === 'any' ? 'Mind. ein Tag' : 'Alle Tags', () => { f.tagMode = f.tagMode === 'any' ? 'all' : 'any'; });
+    if (f.glass) chip(`Glas: ${f.glass}`, () => { f.glass = ''; });
+    f.include.forEach((x) => chip(`Mit ${x}`, () => { f.include = f.include.filter((y) => y !== x); }));
+    f.exclude.forEach((x) => chip(`Ohne ${x}`, () => { f.exclude = f.exclude.filter((y) => y !== x); }));
+    if (f.maxIngredients) chip(`≤ ${f.maxIngredients} Zutaten`, () => { f.maxIngredients = 0; });
+    if (f.image !== 'any') chip(f.image === 'with' ? 'Mit Bild' : 'Ohne Bild', () => { f.image = 'any'; });
+    if (f.completeness !== 'any') chip(f.completeness === 'complete' ? 'Rezept vollständig' : 'Rezept lückenhaft', () => { f.completeness = 'any'; });
+    if (f.recent) chip(f.recent === 1 ? 'Heute geändert' : `Letzte ${f.recent} Tage`, () => { f.recent = 0; });
+    box.classList.toggle('hidden', !chips.length);
+    box.classList.toggle('flex', !!chips.length);
+    box.innerHTML = '';
+    chips.forEach(({ label, onRemove }) => {
+        const b = document.createElement('button');
+        b.className = 'chip bg-indigo-600 text-white hover:bg-indigo-700';
+        b.innerHTML = '<span></span> <i class="fas fa-times text-[10px]"></i>';
+        b.firstChild.textContent = label;
+        b.setAttribute('aria-label', `Filter entfernen: ${label}`);
+        b.addEventListener('click', () => { onRemove(); filterAndRenderDrinks(); });
+        box.appendChild(b);
+    });
+    if (chips.length > 1) {
+        const r = document.createElement('button');
+        r.className = 'text-xs font-semibold text-indigo-600 hover:underline dark:text-zest-300';
+        r.textContent = 'Alle entfernen';
+        r.addEventListener('click', () => { filters = emptyFilters(); filterAndRenderDrinks(); });
+        box.appendChild(r);
+    }
+}
+
+// ============================================================================
+// Tag browser & manager
+// ============================================================================
+function openTagModal() {
+    $('tagFilterInput').value = '';
+    $('tagModalTitle').textContent = perm('manageTags') ? 'Tags verwalten' : 'Tags';
+    renderTagList();
+    openModal($('tagModal'));
+}
+$('tagFilterInput').addEventListener('input', renderTagList);
+function renderTagList() {
+    const q = ($('tagFilterInput').value || '').trim().replace(/^#/, '').toLowerCase();
+    const counts = allTagCounts();
+    const list = Object.keys(counts).filter((t) => !q || t.includes(q)).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+    const box = $('tagList');
+    const manage = perm('manageTags');
+    if (!list.length) { box.innerHTML = `<p class="py-8 text-center text-sm text-gray-500">${q ? 'Keine Treffer.' : 'Noch keine Tags. Tags vergibst du beim Bearbeiten eines Drinks.'}</p>`; return; }
+    box.innerHTML = '';
+    box.classList.add('space-y-2');
+    list.forEach((t) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2 rounded-xl border border-gray-100 p-2 dark:border-plum-800';
+        const c = tagMeta[t]?.color || '';
+        row.innerHTML = `
+            <button type="button" class="tag-go flex min-w-0 flex-1 items-center gap-2 text-left" title="Drinks mit #${esc(t)} anzeigen">
+                ${tagChip(t, { clickable: false })}<span class="hint">${counts[t]} Drink${counts[t] === 1 ? '' : 's'}</span>
+            </button>
+            ${manage ? `
+                <input type="color" class="tag-color h-8 w-9 cursor-pointer rounded border border-gray-200 bg-white p-0.5 dark:border-plum-700 dark:bg-plum-950" value="${esc(safeColor(c || '#6366f1'))}" aria-label="Farbe">
+                ${c ? '<button type="button" class="tag-uncolor icon-btn h-8 w-8" aria-label="Farbe entfernen" title="Farbe entfernen"><i class="fas fa-droplet-slash text-xs"></i></button>' : ''}
+                <button type="button" class="tag-rename icon-btn h-8 w-8" aria-label="Umbenennen"><i class="fas fa-pen text-xs"></i></button>
+                <button type="button" class="tag-delete icon-btn h-8 w-8 text-rose-500" aria-label="Löschen"><i class="fas fa-trash text-xs"></i></button>` : ''}`;
+        row.querySelector('.tag-go').addEventListener('click', () => { closeModal($('tagModal'), true); searchForTag(t); });
+        row.querySelector('.tag-color')?.addEventListener('change', async (e) => { if (await act('setTagColor', { tag: t, color: e.target.value })) toast('Farbe gespeichert.', 'success'); });
+        row.querySelector('.tag-uncolor')?.addEventListener('click', async () => { await act('setTagColor', { tag: t, color: '' }); });
+        row.querySelector('.tag-rename')?.addEventListener('click', async () => {
+            const to = await showChoice({
+                title: `#${t} umbenennen`, okLabel: 'Umbenennen',
+                html: `<label class="label" for="tagRenameInput">Neuer Name</label><input id="tagRenameInput" class="input" value="${esc(t)}"><p class="hint mt-2">Existiert der Tag schon, werden beide zusammengeführt.</p>`,
+                read: (b) => { const v = normTag(b.querySelector('#tagRenameInput').value); if (!v) { toast('Ungültiger Tag.', 'error'); return undefined; } return v; },
+            });
+            if (to && to !== t) { const r = await act('renameTag', { from: t, to }); if (r) toast(`#${t} → #${to} (${r.changed} Drinks)`, 'success'); }
+        });
+        row.querySelector('.tag-delete')?.addEventListener('click', async () => {
+            if (!(await showConfirm(`#${t} wird von ${counts[t]} Drink(s) entfernt.`, { title: 'Tag löschen?', confirmLabel: 'Löschen' }))) return;
+            if (await act('deleteTag', { tag: t })) toast(`#${t} gelöscht.`, 'success');
+        });
+        box.appendChild(row);
+    });
+}
+
+// ============================================================================
+// Bulk selection (edit mode)
+// ============================================================================
+function setSelectMode(on) {
+    selectMode = !!on && isEdit();
+    if (!selectMode) selectedDrinks.clear();
+    const b = $('selectModeBtn');
+    b.className = `btn btn-sm flex-shrink-0 ${selectMode ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'btn-secondary'} ${isEdit() ? '' : 'hidden'}`;
+    b.innerHTML = selectMode ? '<i class="fas fa-xmark"></i> Auswahl beenden' : '<i class="far fa-square-check"></i> Auswählen';
+    if (initialLoadComplete) filterAndRenderDrinks();
+    updateBulkBar();
+}
+function toggleSelected(id) {
+    if (selectedDrinks.has(id)) selectedDrinks.delete(id); else selectedDrinks.add(id);
+    const el = document.querySelector(`[data-drink-id="${CSS.escape(id)}"]`);
+    if (el) {
+        const fresh = prefs.view === 'list' ? buildDrinkRow(id, allDrinks[id], prefs.searchAll) : buildDrinkCard(id, allDrinks[id], prefs.searchAll);
+        el.replaceWith(fresh);
+    }
+    updateBulkBar();
+}
+function updateBulkBar() {
+    const show = selectMode;
+    $('bulkBar').classList.toggle('hidden', !show);
+    $('bulkBar').style.left = (!isMobile() && !sidebar.classList.contains('-translate-x-full')) ? '16rem' : '0';
+    $('mainArea').style.paddingBottom = show ? '7rem' : '';
+    $('toastContainer').style.bottom = show ? 'calc(env(safe-area-inset-bottom) + 5.5rem)' : '';
+    $('bulkCount').innerHTML = `${selectedDrinks.size}<span class="hidden sm:inline"> ausgewählt</span>`;
+    ['bulkMoveBtn', 'bulkCopyBtn', 'bulkTagBtn', 'bulkTypeBtn', 'bulkDeleteBtn'].forEach((id) => { $(id).disabled = !selectedDrinks.size; });
+    const allOn = lastVisibleIds.length && lastVisibleIds.every((id) => selectedDrinks.has(id));
+    $('bulkAllBtn').textContent = allOn ? 'Keine' : 'Alle';
+}
+$('selectModeBtn').addEventListener('click', () => setSelectMode(!selectMode));
+$('bulkDoneBtn').addEventListener('click', () => setSelectMode(false));
+$('bulkAllBtn').addEventListener('click', () => {
+    const allOn = lastVisibleIds.every((id) => selectedDrinks.has(id));
+    lastVisibleIds.forEach((id) => (allOn ? selectedDrinks.delete(id) : selectedDrinks.add(id)));
+    filterAndRenderDrinks();
+});
+async function runBulk(op, value, label) {
+    const ids = [...selectedDrinks];
+    const r = await act('bulkDrinks', { ids, op, value }, { modeOverride: 'edit' });
+    if (r) { toast(label(r.count), 'success'); if (op === 'delete' || op === 'move') selectedDrinks.clear(); updateBulkBar(); }
+}
+$('bulkMoveBtn').addEventListener('click', async () => {
+    const v = await showChoice({ title: 'Verschieben nach', okLabel: 'Verschieben', html: `<select id="bulkFolder" class="input">${folderOptions(selectedCategoryId)}</select>`, read: (b) => b.querySelector('#bulkFolder').value || undefined });
+    if (v) runBulk('move', v, (n) => `${n} Drink(s) verschoben.`);
+});
+$('bulkCopyBtn').addEventListener('click', async () => {
+    const v = await showChoice({ title: 'Kopieren nach', okLabel: 'Kopieren', html: `<select id="bulkFolder" class="input">${folderOptions()}</select>`, read: (b) => b.querySelector('#bulkFolder').value || undefined });
+    if (v) runBulk('copy', v, (n) => `${n} Drink(s) kopiert.`);
+});
+$('bulkTagBtn').addEventListener('click', async () => {
+    const v = await showChoice({
+        title: 'Tag für Auswahl', okLabel: 'Anwenden',
+        html: `<div class="seg mb-3"><button type="button" data-op="addTag" class="seg-btn is-active">Hinzufügen</button><button type="button" data-op="removeTag" class="seg-btn">Entfernen</button></div>
+               <input id="bulkTagInput" class="input" placeholder="#tag" list="bulkTagList"><datalist id="bulkTagList">${Object.keys(allTagCounts()).map((t) => `<option value="${esc(t)}">`).join('')}</datalist>`,
+        read: (b) => { const t = normTag(b.querySelector('#bulkTagInput').value); if (!t) { toast('Ungültiger Tag.', 'error'); return undefined; } return { t, op: b.querySelector('.seg-btn.is-active').dataset.op }; },
+    });
+    if (v) runBulk(v.op, v.t, (n) => `#${v.t} ${v.op === 'addTag' ? 'hinzugefügt' : 'entfernt'} (${n}).`);
+});
+$('choiceBody').addEventListener('click', (e) => {
+    const b = e.target.closest('.seg-btn');
+    if (!b) return;
+    b.parentElement.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('is-active', x === b));
+});
+$('bulkTypeBtn').addEventListener('click', async () => {
+    const v = await showChoice({ title: 'Typ festlegen', okLabel: 'Übernehmen', html: '<select id="bulkType" class="input"><option>Cocktail</option><option>Mocktail</option></select>', read: (b) => b.querySelector('#bulkType').value });
+    if (v) runBulk('setType', v, (n) => `${n} Drink(s) sind jetzt ${v}s.`);
+});
+$('bulkDeleteBtn').addEventListener('click', async () => {
+    const n = selectedDrinks.size;
+    if (!(await showConfirm(`${n} Drink(s) werden endgültig gelöscht.`, { title: 'Auswahl löschen?', confirmLabel: 'Löschen', typeToConfirm: n > 5 ? 'LÖSCHEN' : null }))) return;
+    runBulk('delete', null, (c) => `${c} Drink(s) gelöscht.`);
+});
+
+// ============================================================================
+// Copy recipe as text
+// ============================================================================
+$('recipePopupCopyBtn').addEventListener('click', async () => {
+    const d = allDrinks[currentRecipePopupDrinkId];
+    if (!d) return;
+    const lines = [`${d.name}${d.symbols ? ` ${d.symbols}` : ''} (${d.type})`];
+    if (d.glass) lines.push(`Glas: ${d.glass}`);
+    if ((d.ingredients || []).length) { lines.push('', 'Zutaten:'); d.ingredients.forEach((i) => lines.push(`- ${scaleAmount(i.amount, popupServings)} ${i.item}`)); }
+    if (d.recipe) lines.push('', 'Zubereitung:', d.recipe);
+    if (d.garnish) lines.push('', `Garnitur: ${d.garnish}`);
+    if ((d.tags || []).length) lines.push('', d.tags.map((t) => `#${t}`).join(' '));
+    try { await navigator.clipboard.writeText(lines.join('\n')); toast('Rezept kopiert.', 'success'); }
+    catch { toast('Kopieren wird von diesem Browser nicht unterstützt.', 'error'); }
 });
