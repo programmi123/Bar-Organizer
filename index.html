@@ -2,22 +2,950 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bar Organizer</title>
-    <link rel="stylesheet" href="styles/styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Bar Organizer Deluxe</title>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="BarOrganizer">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon-180x180.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/apple-touch-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="icons/apple-touch-icon-167x167.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180x180.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        // Apply theme before first paint (prevents flash)
+        (function () {
+            try {
+                var t = localStorage.getItem('theme') || 'system';
+                var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                if (dark) document.documentElement.classList.add('dark');
+            } catch (e) {}
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['"Bricolage Grotesque"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                        sans: ['Figtree', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+                    },
+                    colors: {
+                        plum: { 950: '#140f24', 900: '#1e1633', 800: '#2a2046', 700: '#3b2e60', 600: '#54457f' },
+                        zest: { 300: '#f8cf73', 400: '#f5b841', 500: '#e9a31f' },
+                    },
+                },
+            },
+        };
+    </script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+
+    <style type="text/tailwindcss">
+        @layer components {
+            .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-plum-900 disabled:cursor-not-allowed disabled:opacity-50; }
+            .btn-primary { @apply bg-indigo-600 text-white shadow-sm hover:bg-indigo-700; }
+            .btn-secondary { @apply bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-plum-800 dark:text-gray-100 dark:hover:bg-plum-700; }
+            .btn-danger { @apply bg-rose-600 text-white shadow-sm hover:bg-rose-700; }
+            .btn-success { @apply bg-emerald-600 text-white shadow-sm hover:bg-emerald-700; }
+            .btn-ghost { @apply text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-plum-800; }
+            .btn-sm { @apply gap-1.5 px-3 py-1.5 text-xs; }
+            .icon-btn { @apply inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-gray-300 dark:hover:bg-plum-800; }
+            .input { @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 dark:border-plum-700 dark:bg-plum-950 dark:text-gray-100 dark:placeholder-gray-500; }
+            .label { @apply mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300; }
+            .hint { @apply text-xs text-gray-500 dark:text-gray-400; }
+            .panel { @apply relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl dark:bg-plum-900 sm:rounded-2xl; }
+            .panel-head { @apply flex flex-shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-plum-800 sm:px-6; }
+            .panel-title { @apply font-display text-xl font-bold text-gray-900 dark:text-white; }
+            .panel-body { @apply flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6; }
+            .panel-foot { @apply flex flex-shrink-0 flex-wrap items-center justify-end gap-2 border-t border-gray-100 px-5 py-4 dark:border-plum-800 sm:px-6; }
+            .chip { @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+            .seg { @apply flex rounded-lg bg-gray-200/70 p-1 dark:bg-plum-800; }
+            .seg-btn { @apply flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white sm:text-sm; }
+            .seg-btn.is-active { @apply bg-white text-indigo-700 shadow-sm dark:bg-plum-600 dark:text-white; }
+            .check { @apply h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-plum-600 dark:bg-plum-950; }
+            .menu-item { @apply flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-plum-800; }
+            .tab-btn { @apply whitespace-nowrap border-b-2 border-transparent px-3 py-2.5 text-sm font-semibold text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100; }
+            .tab-btn.is-active { @apply border-indigo-600 text-indigo-700 dark:border-zest-400 dark:text-zest-300; }
+        }
+    </style>
+    <style>
+        html, body { overscroll-behavior: none; }
+        body {
+            -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        input, textarea, [contenteditable], .selectable { -webkit-user-select: text; user-select: text; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #c4c4d4; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #3b2e60; }
+
+        .modal-backdrop { background-color: rgba(20, 15, 36, 0.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+        .modal-backdrop > .panel { animation: sheet-in .22s cubic-bezier(.2,.8,.2,1); }
+        @keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+        .drink-card { transition: box-shadow .2s ease, transform .2s ease; }
+        .drink-card:hover { box-shadow: 0 12px 28px -12px rgba(30, 22, 51, .35); }
+        .drink-card.flash { animation: flash 1.4s ease; }
+        @keyframes flash { 0%, 100% { box-shadow: 0 0 0 0 rgba(245, 184, 65, 0); } 30% { box-shadow: 0 0 0 4px rgba(245, 184, 65, .9); } }
+        .clamp-4 { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+
+        .sortable-ghost { opacity: .4; }
+        input[type=checkbox].check { accent-color: #4f46e5; }
+        .dark input[type=checkbox].check { accent-color: #f5b841; }
+        .drag-handle { cursor: grab; touch-action: none; }
+
+        /* Login wordmark – the pour line (separate element below the heading, never overlaps text) */
+        .pour-line {
+            height: 6px; width: min(22rem, 85%); border-radius: 99px;
+            background: linear-gradient(90deg, #f5b841, #f5b841 35%, rgba(245,184,65,0) 100%);
+            transform-origin: left; animation: pour 1.1s .2s cubic-bezier(.3,.7,.2,1) both;
+        }
+        body { padding-bottom: env(safe-area-inset-bottom); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { scrollbar-width: none; }
+        .drink-card.is-selected { box-shadow: 0 0 0 3px #4f46e5; }
+        @keyframes pour { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+        .live-dot { width: .55rem; height: .55rem; border-radius: 999px; background: #9ca3af; }
+        .live-dot.is-live { background: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.25); }
+        .live-dot.is-offline { background: #e11d48; }
+
+        .toast-enter { animation: toast-in .25s ease; }
+        @keyframes toast-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+        }
+
+        /* Printing a single recipe */
+        @media print {
+            body.printing-recipe > *:not(#recipePopupModal) { display: none !important; }
+            body.printing-recipe #recipePopupModal { position: static !important; display: block !important; background: none !important; backdrop-filter: none !important; padding: 0 !important; }
+            body.printing-recipe #recipePopupModal .panel { box-shadow: none !important; max-height: none !important; border-radius: 0 !important; }
+            body.printing-recipe #recipePopupModal .no-print { display: none !important; }
+            body.printing-recipe .panel-body { overflow: visible !important; }
+        }
+    </style>
 </head>
-<body>
-    <div class="container">
-        <h1>Mocktail- und Cocktail-Rezepte</h1>
-        <input type="text" id="search" placeholder="Cocktailnamen oder Zutaten (kommagetrennt) eingeben..." oninput="searchRecipes()">
-        <div>
-            <button id="btnMocktails" onclick="filterByType('Mocktail')" class="active">Mocktails</button>
-            <button id="btnCocktails" onclick="filterByType('Cocktail')">Cocktails</button>
-            <button id="btnAll" onclick="filterByType('Alles')">Alles</button>
-        </div>
-        <div id="results"></div>
+<body class="bg-[#f6f6fa] font-sans leading-normal text-gray-800 antialiased transition-colors duration-300 dark:bg-plum-950 dark:text-gray-100">
+
+    <!-- ============================ BOOT SPLASH ============================ -->
+    <div id="bootScreen" class="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-plum-900 text-white">
+        <p class="font-display text-3xl font-extrabold tracking-tight">Bar Organizer</p>
+        <i class="fas fa-circle-notch fa-spin mt-6 text-2xl text-zest-400" aria-hidden="true"></i>
+        <span class="sr-only">Wird geladen…</span>
     </div>
 
-    <script src="scripts/main.js"></script>
+    <!-- ============================ AUTH SCREEN ============================ -->
+    <div id="authScreen" class="fixed inset-0 z-[80] hidden overflow-y-auto bg-plum-900 text-white">
+        <div class="mx-auto flex min-h-full max-w-5xl flex-col justify-center gap-10 px-6 py-12 md:flex-row md:items-center md:gap-16">
+            <div class="md:w-1/2">
+                <h1 class="font-display text-5xl font-extrabold leading-[0.95] tracking-tight sm:text-6xl">
+                    <span id="authTitle" class="block">Bar Organizer</span><span class="block text-indigo-300">Deluxe</span>
+                </h1>
+                <div class="pour-line mt-5" aria-hidden="true"></div>
+                <p class="mt-6 max-w-sm text-base text-gray-300">Rezepte, Ordner und Bestellungen für dein Team – an einem Ort, auf jedem Gerät.</p>
+            </div>
+
+            <div class="w-full md:w-[26rem]">
+                <div class="rounded-2xl bg-white p-6 text-gray-800 shadow-2xl dark:bg-plum-800 dark:text-gray-100 sm:p-8">
+                    <!-- Login -->
+                    <form id="loginForm" class="space-y-4" novalidate>
+                        <h2 class="font-display text-2xl font-bold">Anmelden</h2>
+                        <div>
+                            <label for="loginEmail" class="label">E-Mail</label>
+                            <input id="loginEmail" type="email" autocomplete="username" required class="input">
+                        </div>
+                        <div>
+                            <div class="flex items-baseline justify-between">
+                                <label for="loginPassword" class="label">Passwort</label>
+                                <button type="button" data-auth-view="forgot" class="text-xs font-semibold text-indigo-600 hover:underline dark:text-zest-300">Passwort vergessen?</button>
+                            </div>
+                            <div class="relative">
+                                <input id="loginPassword" type="password" autocomplete="current-password" required class="input pr-10">
+                                <button type="button" class="pw-toggle absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-gray-600" aria-label="Passwort anzeigen"><i class="fas fa-eye"></i></button>
+                            </div>
+                        </div>
+                        <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                            <input id="loginRemember" type="checkbox" class="check" checked> Angemeldet bleiben
+                        </label>
+                        <p id="loginError" class="hidden rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" role="alert"></p>
+                        <button type="submit" class="btn btn-primary w-full py-3">Anmelden</button>
+                        <p id="registerLinkWrap" class="text-center text-xs text-gray-500 dark:text-gray-400">
+                            Noch kein Konto? <button type="button" data-auth-view="register" class="font-semibold text-indigo-600 hover:underline dark:text-zest-300">Konto erstellen</button>
+                        </p>
+                    </form>
+
+                    <!-- Register -->
+                    <form id="registerForm" class="hidden space-y-4" novalidate>
+                        <h2 class="font-display text-2xl font-bold">Konto erstellen</h2>
+                        <div>
+                            <label for="regName" class="label">Name</label>
+                            <input id="regName" type="text" autocomplete="name" maxlength="40" required class="input">
+                        </div>
+                        <div>
+                            <label for="regEmail" class="label">E-Mail</label>
+                            <input id="regEmail" type="email" autocomplete="email" required class="input">
+                        </div>
+                        <div>
+                            <label for="regPassword" class="label">Passwort</label>
+                            <div class="relative">
+                                <input id="regPassword" type="password" autocomplete="new-password" minlength="8" required class="input pr-10">
+                                <button type="button" class="pw-toggle absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-gray-600" aria-label="Passwort anzeigen"><i class="fas fa-eye"></i></button>
+                            </div>
+                            <div class="mt-2 flex gap-1" aria-hidden="true">
+                                <span class="pw-bar h-1 flex-1 rounded bg-gray-200 dark:bg-plum-700"></span>
+                                <span class="pw-bar h-1 flex-1 rounded bg-gray-200 dark:bg-plum-700"></span>
+                                <span class="pw-bar h-1 flex-1 rounded bg-gray-200 dark:bg-plum-700"></span>
+                                <span class="pw-bar h-1 flex-1 rounded bg-gray-200 dark:bg-plum-700"></span>
+                            </div>
+                            <p id="regPwHint" class="hint mt-1">Mindestens 8 Zeichen.</p>
+                        </div>
+                        <div>
+                            <label for="regPassword2" class="label">Passwort wiederholen</label>
+                            <input id="regPassword2" type="password" autocomplete="new-password" required class="input">
+                        </div>
+                        <p id="registerError" class="hidden rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" role="alert"></p>
+                        <button type="submit" class="btn btn-primary w-full py-3">Konto erstellen</button>
+                        <p class="text-center text-xs text-gray-500 dark:text-gray-400">
+                            Schon registriert? <button type="button" data-auth-view="login" class="font-semibold text-indigo-600 hover:underline dark:text-zest-300">Anmelden</button>
+                        </p>
+                    </form>
+
+                    <!-- Forgot password -->
+                    <form id="forgotForm" class="hidden space-y-4" novalidate>
+                        <h2 class="font-display text-2xl font-bold">Passwort zurücksetzen</h2>
+                        <p class="text-sm text-gray-600 dark:text-gray-300">Gib deine E-Mail-Adresse ein. Du bekommst einen Link, mit dem du ein neues Passwort festlegst.</p>
+                        <div>
+                            <label for="forgotEmail" class="label">E-Mail</label>
+                            <input id="forgotEmail" type="email" autocomplete="email" required class="input">
+                        </div>
+                        <p id="forgotMsg" class="hidden rounded-lg px-3 py-2 text-sm" role="status"></p>
+                        <button type="submit" class="btn btn-primary w-full py-3">Link senden</button>
+                        <p class="text-center text-xs"><button type="button" data-auth-view="login" class="font-semibold text-indigo-600 hover:underline dark:text-zest-300"><i class="fas fa-arrow-left mr-1"></i>Zurück zur Anmeldung</button></p>
+                    </form>
+
+                    <!-- Forced password change -->
+                    <form id="forcePwForm" class="hidden space-y-4" novalidate>
+                        <h2 class="font-display text-2xl font-bold">Neues Passwort festlegen</h2>
+                        <p class="text-sm text-gray-600 dark:text-gray-300">Dein Konto wurde mit einem vorläufigen Passwort angelegt. Lege jetzt dein eigenes fest.</p>
+                        <input id="fpCurrent" type="password" autocomplete="current-password" placeholder="Vorläufiges Passwort" class="input">
+                        <input id="fpNew" type="password" autocomplete="new-password" placeholder="Neues Passwort" class="input">
+                        <input id="fpNew2" type="password" autocomplete="new-password" placeholder="Neues Passwort wiederholen" class="input">
+                        <p id="forcePwError" class="hidden rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" role="alert"></p>
+                        <button type="submit" class="btn btn-primary w-full py-3">Passwort speichern</button>
+                        <button type="button" id="forcePwLogout" class="btn btn-ghost w-full">Abmelden</button>
+                    </form>
+
+                    <!-- Blocked / verify -->
+                    <div id="blockedView" class="hidden space-y-4">
+                        <h2 id="blockedTitle" class="font-display text-2xl font-bold">Kein Zugriff</h2>
+                        <p id="blockedText" class="text-sm text-gray-600 dark:text-gray-300"></p>
+                        <div class="flex flex-col gap-2">
+                            <button id="blockedResendBtn" type="button" class="btn btn-primary hidden">Bestätigungs-E-Mail erneut senden</button>
+                            <button id="blockedRetryBtn" type="button" class="btn btn-secondary"><i class="fas fa-rotate"></i> Erneut prüfen</button>
+                            <button id="blockedLogoutBtn" type="button" class="btn btn-ghost"><i class="fas fa-right-from-bracket"></i> Abmelden</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================ APP SHELL ============================ -->
+    <div id="appShell" class="hidden">
+        <div class="flex h-[100dvh] overflow-hidden">
+            <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col bg-white shadow-xl transition-transform duration-300 ease-in-out dark:bg-plum-900 md:w-64 print:hidden" aria-label="Ordner">
+                <div class="flex items-center justify-between px-4 pb-2 pt-4">
+                    <h2 class="font-display text-lg font-bold text-gray-900 dark:text-white">Ordner</h2>
+                    <button id="sidebarCloseBtn" class="icon-btn md:hidden" aria-label="Seitenleiste schließen"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="px-4 pb-2">
+                    <input id="folderFilterInput" type="search" placeholder="Ordner filtern…" class="input py-2 text-xs" aria-label="Ordner filtern">
+                </div>
+                <nav id="categoriesContainer" class="flex-1 space-y-1 overflow-y-auto px-3 pb-3"></nav>
+                <div class="space-y-1 border-t border-gray-100 p-3 dark:border-plum-800">
+                    <button id="addCategoryButton" class="btn btn-success hidden w-full"><i class="fas fa-folder-plus"></i> Ordner erstellen</button>
+                    <button id="tagBrowserBtn" class="btn btn-ghost w-full justify-start"><i class="fas fa-hashtag w-4"></i> Alle Tags</button>
+                </div>
+            </aside>
+
+            <div id="sidebarOverlay" class="fixed inset-0 z-30 hidden bg-plum-950/50 md:hidden print:hidden"></div>
+
+            <div id="mainArea" class="flex min-w-0 flex-1 flex-col overflow-y-auto transition-[margin] duration-300 ease-in-out">
+                <header class="sticky top-0 z-20 border-b border-gray-200/70 bg-white/90 backdrop-blur dark:border-plum-800 dark:bg-plum-900/90 print:hidden">
+                    <div class="flex items-center gap-2 px-3 py-2.5 sm:px-5">
+                        <button id="sidebarOpenBtn" class="icon-btn" aria-label="Seitenleiste umschalten"><i class="fas fa-bars"></i></button>
+                        <h1 id="appTitle" class="max-w-[9rem] truncate font-display text-lg font-extrabold tracking-tight text-gray-900 dark:text-white sm:max-w-xs sm:text-xl">Bar Organizer</h1>
+                        <span id="liveDot" class="live-dot ml-1" title="Verbindung wird aufgebaut"></span>
+
+                        <div class="relative ml-auto hidden w-full max-w-sm sm:block">
+                            <i class="fas fa-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
+                            <input type="search" id="searchInput" placeholder="Suchen … oder #tag" class="input pl-9 pr-10" aria-label="Suche" autocomplete="off">
+                            <div class="tag-suggest absolute left-0 right-0 top-full z-30 mt-1 hidden max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-plum-700 dark:bg-plum-800"></div>
+                            <kbd class="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-gray-300 px-1.5 text-[10px] text-gray-400 dark:border-plum-700 lg:block">/</kbd>
+                        </div>
+
+                        <div class="ml-auto flex items-center gap-1 sm:ml-2">
+                            <span id="headerModeStatus" class="chip hidden"></span>
+                            <button id="randomDrinkBtn" class="icon-btn" title="Zufälliger Drink" aria-label="Zufälliger Drink"><i class="fas fa-dice"></i></button>
+                            <button id="settingsButton" class="icon-btn" title="Einstellungen" aria-label="Einstellungen"><i class="fas fa-sliders"></i></button>
+                            <div class="relative">
+                                <button id="userMenuBtn" class="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2" aria-haspopup="menu" aria-expanded="false" aria-label="Benutzermenü">?</button>
+                                <div id="userMenu" class="absolute right-0 top-11 z-30 hidden w-64 rounded-xl border border-gray-100 bg-white p-2 shadow-xl dark:border-plum-800 dark:bg-plum-900" role="menu">
+                                    <div class="border-b border-gray-100 px-3 pb-2 pt-1 dark:border-plum-800">
+                                        <p id="userMenuName" class="truncate text-sm font-semibold"></p>
+                                        <p id="userMenuEmail" class="truncate text-xs text-gray-500 dark:text-gray-400"></p>
+                                        <div id="userMenuRole" class="mt-1"></div>
+                                    </div>
+                                    <div class="pt-1">
+                                        <button id="menuProfileBtn" class="menu-item" role="menuitem"><i class="fas fa-user w-4 text-center"></i> Profil & Passwort</button>
+                                        <button id="menuUsersBtn" class="menu-item hidden" role="menuitem"><i class="fas fa-users-gear w-4 text-center"></i> Verwaltung</button>
+                                        <div id="menuExtSlot"></div>
+                                        <button id="menuLogoutBtn" class="menu-item text-rose-600 dark:text-rose-400" role="menuitem"><i class="fas fa-right-from-bracket w-4 text-center"></i> Abmelden</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-2.5 sm:hidden">
+                        <div class="relative">
+                            <i class="fas fa-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
+                            <input type="search" id="searchInputMobile" placeholder="Suchen … oder #tag" class="input pl-9" aria-label="Suche" autocomplete="off">
+                            <div class="tag-suggest absolute left-0 right-0 top-full z-30 mt-1 hidden max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-plum-700 dark:bg-plum-800"></div>
+                        </div>
+                    </div>
+                    <div id="verifyBanner" class="hidden border-t border-zest-400/40 bg-zest-300/20 px-4 py-2 text-xs text-gray-800 dark:text-zest-300">
+                        <i class="fas fa-envelope mr-1"></i> Deine E-Mail-Adresse ist noch nicht bestätigt.
+                        <button id="verifyBannerBtn" class="ml-1 font-semibold underline">Link erneut senden</button>
+                    </div>
+                </header>
+
+                <div id="announcementBanner" class="hidden print:hidden"></div>
+                <main class="w-full flex-1 px-4 py-5 sm:px-6 md:px-8">
+                    <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+                        <div class="min-w-0">
+                            <p id="categoryMeta" class="text-sm text-gray-500 dark:text-gray-400"></p>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <h2 id="categoryTitle" class="truncate font-display text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-4xl">Drinks</h2>
+                                <button id="staffPurgeCategoryBtn" class="btn btn-danger btn-sm hidden"><i class="fas fa-dumpster-fire"></i> Ordner leeren</button>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button id="staffAddExistingDrinkMainBtn" class="btn btn-secondary hidden"><i class="fas fa-magnifying-glass-plus"></i> <span class="hidden sm:inline">Drink</span> hinzufügen</button>
+                            <button id="staffAddNewRecipeMainBtn" class="btn btn-secondary hidden"><i class="fas fa-file-circle-plus"></i> <span class="hidden sm:inline">Neues</span> Rezept</button>
+                            <button id="editModeCloneDrinkBtn" class="btn btn-secondary hidden"><i class="fas fa-clone"></i> Klonen</button>
+                            <button id="addDrinkButton" class="btn btn-primary hidden"><i class="fas fa-plus"></i> Drink</button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center">
+                        <div class="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+                            <div class="seg flex-shrink-0" role="group" aria-label="Typ filtern">
+                                <button data-type="Alles" class="filter-btn seg-btn is-active">Alles</button>
+                                <button data-type="Mocktail" class="filter-btn seg-btn">Mocktails</button>
+                                <button data-type="Cocktail" class="filter-btn seg-btn">Cocktails</button>
+                            </div>
+                            <button id="favFilterBtn" class="btn btn-secondary btn-sm flex-shrink-0" aria-pressed="false" aria-label="Nur Favoriten"><i class="far fa-star"></i><span class="hidden sm:inline">Favoriten</span></button>
+                            <button id="openFilterBtn" class="btn btn-secondary btn-sm flex-shrink-0"><i class="fas fa-filter"></i> Filter <span id="filterCount" class="hidden rounded-full bg-indigo-600 px-1.5 text-[10px] text-white"></span></button>
+                            <button id="selectModeBtn" class="btn btn-secondary btn-sm hidden flex-shrink-0"><i class="far fa-square-check"></i> Auswählen</button>
+                        </div>
+                        <div class="flex items-center gap-2 lg:ml-auto">
+                            <label id="searchAllWrap" class="hidden items-center gap-2 rounded-lg bg-white px-3 py-1.5 text-xs font-medium shadow-sm dark:bg-plum-900">
+                                <input id="searchAllToggle" type="checkbox" class="check h-4 w-4"> Alle Ordner
+                            </label>
+                            <select id="sortSelect" class="input ml-auto w-auto py-1.5 text-xs lg:ml-0" aria-label="Sortierung">
+                                <option value="name">Name A–Z</option>
+                                <option value="name-desc">Name Z–A</option>
+                                <option value="newest">Neueste zuerst</option>
+                                <option value="updated">Zuletzt bearbeitet</option>
+                                <option value="favorites">Favoriten zuerst</option>
+                                <option value="ingredients">Wenigste Zutaten</option>
+                            </select>
+                            <div class="seg flex-shrink-0" role="group" aria-label="Ansicht">
+                                <button data-view="grid" class="view-btn seg-btn is-active" title="Kacheln" aria-label="Kachelansicht"><i class="fas fa-grip"></i></button>
+                                <button data-view="list" class="view-btn seg-btn" title="Liste" aria-label="Listenansicht"><i class="fas fa-list"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="activeFilters" class="mb-4 hidden flex-wrap items-center gap-1.5"></div>
+
+                    <div id="loadingIndicator" class="py-16 text-center">
+                        <i class="fas fa-circle-notch fa-spin fa-2x text-indigo-500"></i>
+                        <p class="mt-3 text-gray-500 dark:text-gray-400">Daten werden geladen…</p>
+                    </div>
+                    <div id="noCategoriesMessage" class="hidden py-16 text-center text-gray-500 dark:text-gray-400">Noch keine Ordner vorhanden. Erstelle einen im Bearbeitungsmodus.</div>
+                    <div id="noDrinksMessage" class="hidden rounded-2xl border-2 border-dashed border-gray-200 py-14 text-center text-gray-500 dark:border-plum-800 dark:text-gray-400"></div>
+                    <div id="drinksContainer" class="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3"></div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================ BULK BAR ============================ -->
+    <div id="bulkBar" class="fixed inset-x-0 bottom-0 z-40 hidden border-t border-gray-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 shadow-2xl backdrop-blur dark:border-plum-800 dark:bg-plum-900/95 print:hidden">
+        <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-2">
+            <span id="bulkCount" class="mr-auto text-sm font-semibold">0</span>
+            <button id="bulkAllBtn" class="btn btn-ghost btn-sm">Alle</button>
+            <button id="bulkMoveBtn" class="btn btn-secondary btn-sm"><i class="fas fa-folder-open"></i><span class="hidden sm:inline">Verschieben</span></button>
+            <button id="bulkCopyBtn" class="btn btn-secondary btn-sm"><i class="fas fa-copy"></i><span class="hidden sm:inline">Kopieren</span></button>
+            <button id="bulkTagBtn" class="btn btn-secondary btn-sm"><i class="fas fa-hashtag"></i><span class="hidden sm:inline">Tags</span></button>
+            <button id="bulkTypeBtn" class="btn btn-secondary btn-sm"><i class="fas fa-martini-glass"></i><span class="hidden sm:inline">Typ</span></button>
+            <button id="bulkDeleteBtn" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i><span class="hidden sm:inline">Löschen</span></button>
+            <button id="bulkDoneBtn" class="btn btn-primary btn-sm">Fertig</button>
+        </div>
+    </div>
+
+    <!-- ============================ TOASTS ============================ -->
+    <div id="toastContainer" class="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-[100] flex flex-col items-center gap-2 px-4 print:hidden" aria-live="polite"></div>
+
+    <!-- ============================ MODALS ============================ -->
+
+    <!-- Settings -->
+    <div id="settingsModal" class="modal modal-backdrop fixed inset-0 z-50 hidden items-end justify-center sm:items-center sm:p-4 print:hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <div class="panel sm:max-w-md">
+            <div class="panel-head">
+                <h3 id="settingsTitle" class="panel-title">Einstellungen</h3>
+                <button class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body">
+                <div>
+                    <p class="label">Design</p>
+                    <div class="seg">
+                        <button data-theme-value="light" class="theme-option-button seg-btn"><i class="fas fa-sun mr-1"></i> Hell</button>
+                        <button data-theme-value="dark" class="theme-option-button seg-btn"><i class="fas fa-moon mr-1"></i> Dunkel</button>
+                        <button data-theme-value="system" class="theme-option-button seg-btn"><i class="fas fa-desktop mr-1"></i> System</button>
+                    </div>
+                </div>
+                <div>
+                    <p class="label">Anzeige</p>
+                    <label class="flex items-center justify-between gap-3 py-1.5 text-sm">
+                        <span>Bilder auf Karten anzeigen</span>
+                        <input id="showImagesToggle" type="checkbox" class="check">
+                    </label>
+                    <label class="flex items-center justify-between gap-3 py-1.5 text-sm">
+                        <span>Rezepttext auf Karten kürzen</span>
+                        <input id="clampRecipeToggle" type="checkbox" class="check">
+                    </label>
+                </div>
+                <div id="modeSection" class="space-y-3 border-t border-gray-100 pt-5 dark:border-plum-800">
+                    <p class="label mb-0">Modus</p>
+                    <div id="editModeRow">
+                        <button id="modalEditModeButton" class="btn w-full"></button>
+                    </div>
+                    <div id="staffModeRow">
+                        <button id="modalStaffModeButton" class="btn w-full"></button>
+                    </div>
+                    <p id="noModesHint" class="hint hidden">Deine Rolle hat keinen Zugriff auf den Bearbeitungs- oder Personal Modus.</p>
+                </div>
+                <div id="dataManagementSection" class="hidden space-y-2 border-t border-gray-100 pt-5 dark:border-plum-800">
+                    <button id="manageIngredientsBtn" class="btn btn-secondary w-full"><i class="fas fa-wine-bottle"></i> Zutaten verwalten</button>
+                </div>
+
+                <p class="hint hidden text-center sm:block">Tastenkürzel: <kbd>/</kbd> Suche, <kbd>F</kbd> Filter, <kbd>N</kbd> neuer Drink, <kbd>Esc</kbd> schließen</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Drink form -->
+    <div id="drinkModal" class="modal modal-backdrop fixed inset-0 z-50 hidden items-end justify-center sm:items-center sm:p-4 print:hidden" role="dialog" aria-modal="true" aria-labelledby="drinkModalTitle" data-guard-dirty="drinkForm">
+        <form id="drinkForm" class="panel sm:max-w-2xl" novalidate>
+            <div class="panel-head">
+                <h3 id="drinkModalTitle" class="panel-title">Drink bearbeiten</h3>
+                <button type="button" class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body">
+                <div id="emptyFieldsToggleContainer" class="hidden items-center justify-between gap-3 rounded-lg border border-zest-400/50 bg-zest-300/15 p-3">
+                    <label for="allowEmptyFieldsToggle" class="cursor-pointer">
+                        <span class="block text-sm font-semibold">Schnelleingabe</span>
+                        <span class="hint">Speichern ohne Rezept und Zutaten erlauben.</span>
+                    </label>
+                    <input type="checkbox" id="allowEmptyFieldsToggle" class="check">
+                </div>
+                <input type="hidden" id="drinkId">
+                <input type="hidden" id="drinkModalTargetCategoryId">
+                <div>
+                    <label for="drinkName" class="label">Name*</label>
+                    <input type="text" id="drinkName" maxlength="100" required class="input">
+                </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="drinkType" class="label">Typ*</label>
+                        <select id="drinkType" required class="input">
+                            <option value="Mocktail">Mocktail</option>
+                            <option value="Cocktail">Cocktail</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="drinkCategory" class="label">Ordner*</label>
+                        <select id="drinkCategory" required class="input"></select>
+                    </div>
+                    <div>
+                        <label for="drinkGlass" class="label">Glas</label>
+                        <input type="text" id="drinkGlass" maxlength="60" list="glassSuggestions" placeholder="z. B. Highball" class="input">
+                        <datalist id="glassSuggestions">
+                            <option value="Highball"><option value="Longdrinkglas"><option value="Tumbler"><option value="Martiniglas"><option value="Coupette"><option value="Hurricane"><option value="Weinglas"><option value="Kupferbecher"><option value="Shotglas">
+                        </datalist>
+                    </div>
+                    <div>
+                        <label for="drinkSymbols" class="label">Symbole (Emoji)</label>
+                        <input type="text" id="drinkSymbols" maxlength="24" placeholder="🍹🌿" class="input">
+                    </div>
+                </div>
+                <div>
+                    <label for="drinkImageUrl" class="label">Bild-URL</label>
+                    <div class="flex gap-3">
+                        <input type="url" id="drinkImageUrl" placeholder="https://beispiel.de/bild.jpg" class="input">
+                        <img id="drinkImagePreview" alt="" class="hidden h-11 w-11 flex-shrink-0 rounded-lg object-cover">
+                    </div>
+                </div>
+                <div>
+                    <div class="mb-1 flex items-center justify-between">
+                        <span class="label mb-0 ingredients-label">Zutaten*</span>
+                        <span class="hint">Reihenfolge per <i class="fas fa-grip-vertical"></i> ändern</span>
+                    </div>
+                    <div id="ingredientsContainer" class="space-y-2"></div>
+                    <button type="button" id="addIngredientBtn" class="btn btn-ghost btn-sm mt-2 text-indigo-600 dark:text-zest-300"><i class="fas fa-plus-circle"></i> Zutat hinzufügen</button>
+                </div>
+                <div>
+                    <label for="drinkRecipe" class="label">Rezept*</label>
+                    <textarea id="drinkRecipe" rows="4" maxlength="5000" class="input"></textarea>
+                </div>
+                <div>
+                    <label for="drinkTagInput" class="label">Tags</label>
+                    <div id="drinkTagBox" class="input flex min-h-[42px] flex-wrap items-center gap-1.5 py-1.5">
+                        <input id="drinkTagInput" type="text" maxlength="31" placeholder="#fruchtig, Enter" class="min-w-[8rem] flex-1 border-0 bg-transparent p-1 text-sm outline-none focus:ring-0" autocomplete="off">
+                    </div>
+                    <div id="drinkTagSuggest" class="mt-1 flex flex-wrap gap-1"></div>
+                </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="drinkGarnish" class="label">Garnitur</label>
+                        <input type="text" id="drinkGarnish" maxlength="100" placeholder="z. B. Limettenrad" class="input">
+                    </div>
+                    <div>
+                        <label for="drinkNotes" class="label">Notizen</label>
+                        <input type="text" id="drinkNotes" maxlength="1000" placeholder="Hinweise fürs Team" class="input">
+                    </div>
+                </div>
+            </div>
+            <div class="panel-foot">
+                <button type="button" class="btn btn-secondary modal-close">Abbrechen</button>
+                <button type="submit" id="drinkSaveBtn" class="btn btn-primary"><i class="fas fa-check"></i> Speichern</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Category form -->
+    <div id="categoryModal" class="modal modal-backdrop fixed inset-0 z-50 hidden items-end justify-center sm:items-center sm:p-4 print:hidden" role="dialog" aria-modal="true" aria-labelledby="categoryModalTitle">
+        <form id="categoryForm" class="panel sm:max-w-md" novalidate>
+            <div class="panel-head">
+                <h3 id="categoryModalTitle" class="panel-title">Ordner bearbeiten</h3>
+                <button type="button" class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body">
+                <input type="hidden" id="categoryId">
+                <div>
+                    <label for="categoryName" class="label">Ordnername*</label>
+                    <input type="text" id="categoryName" maxlength="60" required class="input">
+                </div>
+                <div id="categoryStaffSettingsOuterContainer" class="border-t border-gray-100 pt-4 dark:border-plum-800">
+                    <p class="mb-3 text-sm font-semibold">Was darf das Personal in diesem Ordner?</p>
+                    <div class="space-y-3 text-sm">
+                        <label class="flex cursor-pointer items-center gap-3"><input type="checkbox" id="categoryEnableStaffAddDrink" class="check"> Vorhandene Drinks hinzufügen</label>
+                        <label class="flex cursor-pointer items-center gap-3"><input type="checkbox" id="categoryEnableStaffAddRezept" class="check"> Neue Rezepte anlegen</label>
+                        <label class="flex cursor-pointer items-center gap-3"><input type="checkbox" id="categoryEnableStaffDeleteDrink" class="check"> Einzelne Drinks löschen</label>
+                        <label class="flex cursor-pointer items-center gap-3"><input type="checkbox" id="categoryEnableStaffPurgeFolder" class="check"> Ganzen Ordner leeren</label>
+                        <label class="flex cursor-pointer items-center gap-3"><input type="checkbox" id="categoryEnableStaffQuickConfirm" class="check"> Schnellbestätigung nutzen</label>
+                        <div id="quickConfirmTargetFolderContainer" class="hidden pl-8">
+                            <label for="categoryQuickConfirmTargetFolder" class="hint mb-1 block">Zielordner für die Schnellbestätigung</label>
+                            <select id="categoryQuickConfirmTargetFolder" class="input py-2"></select>
+                        </div>
+                        <div class="border-t border-gray-100 pt-3 dark:border-plum-800">
+                            <label class="flex cursor-pointer items-center gap-3"><input type="checkbox" id="categoryEnableRecipePopup" class="check"> Rezept-Popup per Doppelklick</label>
+                            <p class="hint pl-8">Gilt für alle Nutzer.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-foot">
+                <button type="button" class="btn btn-secondary modal-close">Abbrechen</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Speichern</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Add existing drink / clone -->
+    <div id="addExistingDrinkModal" class="modal modal-backdrop fixed inset-0 z-50 hidden items-end justify-center sm:items-center sm:p-4 print:hidden" role="dialog" aria-modal="true" aria-labelledby="addExistingTitle">
+        <div class="panel sm:max-w-2xl">
+            <div class="panel-head">
+                <h3 id="addExistingTitle" class="panel-title">Vorhandenen Drink hinzufügen</h3>
+                <button class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body">
+                <input type="hidden" id="addExistingDrinkTargetCategoryId">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                        <label for="sourceCategorySelect" class="label">Aus Ordner</label>
+                        <select id="sourceCategorySelect" class="input"></select>
+                    </div>
+                    <div>
+                        <label for="sourceDrinkSearch" class="label">Suche</label>
+                        <input type="search" id="sourceDrinkSearch" placeholder="Name oder Zutat…" class="input">
+                    </div>
+                </div>
+                <div id="sourceDrinksListContainer" class="min-h-[200px] space-y-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recipe popup -->
+    <div id="recipePopupModal" class="modal modal-backdrop fixed inset-0 z-[65] hidden items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="recipePopupTitle">
+        <div class="panel sm:max-w-xl">
+            <div class="panel-head">
+                <h3 id="recipePopupTitle" class="panel-title selectable">Rezept</h3>
+                <div class="no-print flex items-center gap-1">
+                    <button id="recipePopupFavBtn" class="icon-btn" aria-label="Favorit umschalten"><i class="far fa-star"></i></button>
+                    <button id="recipePopupCopyBtn" class="icon-btn" aria-label="Rezept kopieren" title="Rezept kopieren"><i class="far fa-copy"></i></button>
+                    <button id="recipePopupPrintBtn" class="icon-btn" aria-label="Drucken" title="Drucken"><i class="fas fa-print"></i></button>
+                    <button class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="panel-body selectable">
+                <div id="recipePopupImageContainer" class="hidden">
+                    <img id="recipePopupImage" src="" alt="" class="max-h-64 w-full rounded-xl object-cover">
+                </div>
+                <div id="recipePopupContent"></div>
+            </div>
+            <div id="recipePopupFoot" class="panel-foot no-print">
+                <button id="recipePopupEditBtn" class="btn btn-secondary hidden mr-auto"><i class="fas fa-pen"></i> Bearbeiten</button>
+                <button id="recipePopupSchnellbestaetigungBtn" class="btn btn-success hidden"><i class="fas fa-check-double"></i> Schnellbestätigung</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ingredient editor -->
+    <div id="ingredientEditorModal" class="modal modal-backdrop fixed inset-0 z-[60] hidden items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="ingredientEditorTitle">
+        <div class="panel sm:max-w-lg">
+            <div class="panel-head">
+                <h3 id="ingredientEditorTitle" class="panel-title">Zutaten verwalten</h3>
+                <button class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="px-5 pt-4 sm:px-6">
+                <input id="ingredientFilterInput" type="search" placeholder="Zutaten filtern…" class="input">
+            </div>
+            <div class="panel-body" id="ingredientListContainer"></div>
+            <div class="panel-foot">
+                <form id="addIngredientForm" class="flex w-full gap-2">
+                    <input type="text" id="newIngredientName" maxlength="100" placeholder="Neue Zutat" class="input">
+                    <button type="submit" class="btn btn-success" aria-label="Zutat hinzufügen"><i class="fas fa-plus"></i></button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile -->
+    <div id="profileModal" class="modal modal-backdrop fixed inset-0 z-50 hidden items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+        <div class="panel sm:max-w-md">
+            <div class="panel-head">
+                <h3 id="profileTitle" class="panel-title">Profil</h3>
+                <button class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body">
+                <div class="flex items-center gap-4">
+                    <span id="profileAvatar" class="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 font-display text-xl font-bold text-white">?</span>
+                    <div class="min-w-0">
+                        <p id="profileEmail" class="truncate text-sm text-gray-600 dark:text-gray-300"></p>
+                        <div id="profileRole" class="mt-1"></div>
+                    </div>
+                </div>
+                <div id="profilePerms" class="flex flex-wrap gap-1.5"></div>
+                <form id="profileNameForm" class="space-y-2 border-t border-gray-100 pt-5 dark:border-plum-800">
+                    <label for="profileName" class="label">Anzeigename</label>
+                    <div class="flex gap-2">
+                        <input id="profileName" type="text" maxlength="40" class="input">
+                        <button type="submit" class="btn btn-primary">Speichern</button>
+                    </div>
+                </form>
+                <div id="profileVerifyRow" class="hidden rounded-lg bg-zest-300/20 p-3 text-sm">
+                    E-Mail noch nicht bestätigt. <button id="profileVerifyBtn" class="font-semibold underline">Link senden</button>
+                </div>
+                <form id="passwordForm" class="space-y-3 border-t border-gray-100 pt-5 dark:border-plum-800" novalidate>
+                    <p class="label mb-0">Passwort ändern</p>
+                    <input id="pwCurrent" type="password" autocomplete="current-password" placeholder="Aktuelles Passwort" class="input">
+                    <input id="pwNew" type="password" autocomplete="new-password" placeholder="Neues Passwort" class="input">
+                    <input id="pwNew2" type="password" autocomplete="new-password" placeholder="Neues Passwort wiederholen" class="input">
+                    <button type="submit" class="btn btn-secondary w-full">Passwort ändern</button>
+                </form>
+            </div>
+            <div class="panel-foot">
+                <button id="profileRevokeBtn" class="btn btn-ghost w-full text-rose-600 sm:w-auto dark:text-rose-400"><i class="fas fa-laptop-medical"></i> Auf allen Geräten abmelden</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users / admin panel -->
+    <div id="usersModal" class="modal modal-backdrop fixed inset-0 z-50 hidden items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="usersTitle">
+        <div class="panel h-[92vh] sm:h-[85vh] sm:max-w-4xl">
+            <div class="panel-head">
+                <h3 id="usersTitle" class="panel-title">Verwaltung</h3>
+                <div class="flex items-center gap-1">
+                    <button id="usersRefreshBtn" class="icon-btn" aria-label="Aktualisieren"><i class="fas fa-rotate"></i></button>
+                    <button class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="flex flex-shrink-0 gap-1 overflow-x-auto border-b border-gray-100 px-4 dark:border-plum-800" role="tablist">
+                <button class="tab-btn is-active" data-tab="users" role="tab">Benutzer</button>
+                <button class="tab-btn" data-tab="roles" role="tab">Rollen</button>
+                <button class="tab-btn" data-tab="settings" role="tab">App</button>
+                <button class="tab-btn hidden" data-tab="audit" role="tab">Protokoll</button>
+                <button class="tab-btn hidden" data-tab="data" role="tab">Sicherung</button>
+            </div>
+            <div class="panel-body" id="usersPanelBody">
+                <!-- Users tab -->
+                <section data-tab-panel="users" class="space-y-4">
+                    <div class="flex flex-wrap gap-2">
+                        <input id="userSearchInput" type="search" placeholder="Name oder E-Mail suchen…" class="input w-full sm:w-auto sm:max-w-xs sm:flex-1">
+                        <select id="userRoleFilter" class="input min-w-0 flex-1 sm:w-auto sm:flex-none" aria-label="Nach Rolle filtern"></select>
+                        <button id="createUserBtn" class="btn btn-primary hidden sm:ml-auto"><i class="fas fa-user-plus"></i> <span class="hidden sm:inline">Benutzer</span> anlegen</button>
+                    </div>
+                    <div id="usersList" class="space-y-2"></div>
+                </section>
+                <!-- Roles tab -->
+                <section data-tab-panel="roles" class="hidden space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="hint max-w-lg">Der Index (1–10) bestimmt die Rangfolge: Benutzer ohne Adminrecht können nur Benutzer mit niedrigerem Index verwalten und nur niedrigere Rollen vergeben. Die Standardrolle (Index 0) erhalten neue Konten.</p>
+                        <button id="createRoleBtn" class="btn btn-primary hidden"><i class="fas fa-plus"></i> Rolle erstellen</button>
+                    </div>
+                    <div id="rolesList" class="space-y-2"></div>
+                </section>
+                <!-- Settings tab -->
+                <section data-tab-panel="settings" class="hidden space-y-4">
+                    <div id="statsGrid" class="grid grid-cols-2 gap-3 sm:grid-cols-4"></div>
+                    <div id="appSettingsForm" class="space-y-4"></div>
+                </section>
+                <!-- Audit tab -->
+                <section data-tab-panel="audit" class="hidden space-y-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input id="auditSearch" type="search" placeholder="Protokoll durchsuchen…" class="input w-full sm:max-w-xs sm:flex-1">
+                        <span id="auditInfo" class="hint"></span>
+                    </div>
+                    <div id="auditList" class="space-y-1.5"></div>
+                </section>
+                <!-- Data tab -->
+                <section data-tab-panel="data" class="hidden space-y-4">
+                    <div id="exportBox" class="rounded-xl border border-gray-100 p-4 dark:border-plum-800">
+                        <p class="text-sm font-semibold">Export</p>
+                        <p class="hint mb-3">Lädt alle Ordner, Drinks und Zutaten als JSON-Datei herunter.</p>
+                        <button id="exportBtn" class="btn btn-secondary"><i class="fas fa-download"></i> Sicherung herunterladen</button>
+                    </div>
+                    <div id="importBox" class="hidden rounded-xl border border-gray-100 p-4 dark:border-plum-800">
+                        <p class="text-sm font-semibold">Import (zusammenführen)</p>
+                        <p class="hint mb-3">Fügt nur Einträge hinzu, die noch nicht existieren. Bestehende Daten werden nie überschrieben oder gelöscht.</p>
+                        <label class="btn btn-secondary cursor-pointer"><i class="fas fa-upload"></i> Datei wählen<input id="importFile" type="file" accept="application/json,.json" class="hidden"></label>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- Role editor -->
+    <div id="roleModal" class="modal modal-backdrop fixed inset-0 z-[60] hidden items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="roleModalTitle">
+        <form id="roleForm" class="panel sm:max-w-md" novalidate>
+            <div class="panel-head">
+                <h3 id="roleModalTitle" class="panel-title">Rolle</h3>
+                <button type="button" class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body">
+                <input type="hidden" id="roleId">
+                <div class="grid grid-cols-[1fr_auto] gap-3">
+                    <div>
+                        <label for="roleName" class="label">Name*</label>
+                        <input id="roleName" type="text" maxlength="30" required class="input">
+                    </div>
+                    <div>
+                        <label for="roleColor" class="label">Farbe</label>
+                        <input id="roleColor" type="color" value="#6366f1" class="h-[42px] w-14 cursor-pointer rounded-lg border border-gray-300 bg-white p-1 dark:border-plum-700 dark:bg-plum-950">
+                    </div>
+                </div>
+                <div id="roleIndexWrap">
+                    <label for="roleIndex" class="label">Index (Rang)</label>
+                    <select id="roleIndex" class="input"></select>
+                </div>
+                <fieldset>
+                    <legend class="label">Berechtigungen</legend>
+                    <div id="rolePermList" class="space-y-3"></div>
+                    <p id="roleDefaultHint" class="hint mt-3 hidden">Die Standardrolle kann aus Sicherheitsgründen keine Administratorrechte erhalten.</p>
+                    <p id="roleLimitHint" class="hint mt-3 hidden">Du kannst nur Rechte vergeben, die du selbst hast, und nur Indizes unter deinem eigenen.</p>
+                </fieldset>
+            </div>
+            <div class="panel-foot">
+                <button type="button" id="roleDeleteBtn" class="btn btn-ghost mr-auto hidden text-rose-600"><i class="fas fa-trash"></i> Löschen</button>
+                <button type="button" class="btn btn-secondary modal-close">Abbrechen</button>
+                <button type="submit" class="btn btn-primary">Speichern</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Create user -->
+    <div id="createUserModal" class="modal modal-backdrop fixed inset-0 z-[60] hidden items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="createUserTitle">
+        <form id="createUserForm" class="panel sm:max-w-md" novalidate>
+            <div class="panel-head">
+                <h3 id="createUserTitle" class="panel-title">Benutzer anlegen</h3>
+                <button type="button" class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body">
+                <p class="hint">Es wird keine E-Mail verschickt. Gib der Person die Zugangsdaten selbst weiter.</p>
+                <div><label for="cuName" class="label">Name*</label><input id="cuName" type="text" maxlength="40" class="input"></div>
+                <div><label for="cuEmail" class="label">E-Mail*</label><input id="cuEmail" type="email" class="input" autocomplete="off"></div>
+                <div>
+                    <label for="cuPassword" class="label">Passwort*</label>
+                    <div class="flex gap-2">
+                        <input id="cuPassword" type="text" class="input font-mono" autocomplete="new-password" spellcheck="false">
+                        <button type="button" id="cuGenBtn" class="btn btn-secondary" title="Passwort erzeugen" aria-label="Passwort erzeugen"><i class="fas fa-dice"></i></button>
+                        <button type="button" id="cuCopyBtn" class="btn btn-secondary" title="Kopieren" aria-label="Kopieren"><i class="far fa-copy"></i></button>
+                    </div>
+                    <p id="cuPwHint" class="hint mt-1"></p>
+                </div>
+                <div><label for="cuRole" class="label">Rolle</label><select id="cuRole" class="input"></select></div>
+                <label class="flex items-center gap-3 text-sm"><input id="cuForce" type="checkbox" class="check" checked> Passwort bei der ersten Anmeldung ändern</label>
+                <label class="flex items-center gap-3 text-sm"><input id="cuVerified" type="checkbox" class="check"> E-Mail als bestätigt markieren</label>
+            </div>
+            <div class="panel-foot">
+                <button type="button" class="btn btn-secondary modal-close">Abbrechen</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Konto anlegen</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Filter -->
+    <div id="filterModal" class="modal modal-backdrop fixed inset-0 z-50 hidden items-end justify-center sm:items-center sm:p-4 print:hidden" role="dialog" aria-modal="true" aria-labelledby="filterTitle">
+        <div class="panel sm:max-w-lg">
+            <div class="panel-head">
+                <h3 id="filterTitle" class="panel-title">Filter</h3>
+                <button class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body" id="filterBody"></div>
+            <div class="panel-foot">
+                <button id="filterResetBtn" class="btn btn-ghost mr-auto">Zurücksetzen</button>
+                <button id="filterApplyBtn" class="btn btn-primary">Anzeigen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tag manager / browser -->
+    <div id="tagModal" class="modal modal-backdrop fixed inset-0 z-50 hidden items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="tagModalTitle">
+        <div class="panel sm:max-w-lg">
+            <div class="panel-head">
+                <h3 id="tagModalTitle" class="panel-title">Tags</h3>
+                <button class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="px-5 pt-4 sm:px-6"><input id="tagFilterInput" type="search" placeholder="Tags filtern…" class="input"></div>
+            <div class="panel-body" id="tagList"></div>
+        </div>
+    </div>
+
+    <!-- Set password (admin) -->
+    <div id="setPwModal" class="modal modal-backdrop fixed inset-0 z-[60] hidden items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="setPwTitle">
+        <form id="setPwForm" class="panel sm:max-w-md" novalidate>
+            <div class="panel-head">
+                <h3 id="setPwTitle" class="panel-title">Passwort festlegen</h3>
+                <button type="button" class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body">
+                <input type="hidden" id="setPwUid">
+                <p id="setPwWho" class="text-sm text-gray-600 dark:text-gray-300"></p>
+                <div class="flex gap-2">
+                    <input id="setPwInput" type="text" class="input font-mono" autocomplete="new-password" spellcheck="false">
+                    <button type="button" id="setPwGen" class="btn btn-secondary" aria-label="Passwort erzeugen"><i class="fas fa-dice"></i></button>
+                    <button type="button" id="setPwCopy" class="btn btn-secondary" aria-label="Kopieren"><i class="far fa-copy"></i></button>
+                </div>
+                <label class="flex items-center gap-3 text-sm"><input id="setPwForce" type="checkbox" class="check" checked> Bei der nächsten Anmeldung ändern lassen</label>
+                <p class="hint">Die Person wird auf allen Geräten abgemeldet.</p>
+            </div>
+            <div class="panel-foot">
+                <button type="button" class="btn btn-secondary modal-close">Abbrechen</button>
+                <button type="submit" class="btn btn-primary">Speichern</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Choice (select a folder / tag / type) -->
+    <div id="choiceModal" class="modal modal-backdrop fixed inset-0 z-[65] hidden items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="choiceTitle">
+        <form id="choiceForm" class="panel sm:max-w-sm" novalidate>
+            <div class="panel-head">
+                <h3 id="choiceTitle" class="panel-title">Auswahl</h3>
+                <button type="button" class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body" id="choiceBody"></div>
+            <div class="panel-foot">
+                <button type="button" class="btn btn-secondary modal-close">Abbrechen</button>
+                <button type="submit" id="choiceOk" class="btn btn-primary">OK</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Confirm -->
+    <div id="confirmModal" class="modal modal-backdrop fixed inset-0 z-[70] hidden items-center justify-center p-4 print:hidden" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <div class="panel max-w-md rounded-2xl">
+            <div class="panel-body space-y-3">
+                <h3 id="confirmTitle" class="panel-title">Bist du sicher?</h3>
+                <p id="confirmModalText" class="text-sm text-gray-600 dark:text-gray-300"></p>
+                <div id="confirmTypeWrap" class="hidden">
+                    <label for="confirmTypeInput" class="hint mb-1 block"></label>
+                    <input id="confirmTypeInput" type="text" class="input" autocomplete="off">
+                </div>
+            </div>
+            <div class="panel-foot">
+                <button id="confirmNo" class="btn btn-secondary">Abbrechen</button>
+                <button id="confirmYes" class="btn btn-danger">Bestätigen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert -->
+    <div id="customAlertModal" class="modal modal-backdrop fixed inset-0 z-[75] hidden items-center justify-center p-4 print:hidden" role="alertdialog" aria-modal="true" aria-labelledby="alertTitle">
+        <div class="panel max-w-md rounded-2xl">
+            <div class="panel-body space-y-3">
+                <h3 id="alertTitle" class="panel-title"><i class="fas fa-circle-exclamation mr-1 text-zest-500"></i> Hinweis</h3>
+                <p id="customAlertText" class="text-sm text-gray-600 dark:text-gray-300"></p>
+            </div>
+            <div class="panel-foot">
+                <button id="customAlertCloseBtn" class="btn btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Service Worker registration + update notice
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                var hadController = !!navigator.serviceWorker.controller;
+                navigator.serviceWorker.register('./sw.js').catch(function (e) { console.warn('SW registration failed', e); });
+                navigator.serviceWorker.addEventListener('controllerchange', function () {
+                    if (hadController) window.dispatchEvent(new CustomEvent('app-updated'));
+                    hadController = true;
+                });
+            });
+        }
+    </script>
+    <script type="module" src="./app.js?v=3.1.1"></script>
 </body>
 </html>
