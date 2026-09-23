@@ -1,13 +1,13 @@
 // sw.js – Bar Organizer Deluxe
 // Increment the version whenever cached files change.
-const VERSION = 'v3.1.0';
+const VERSION = 'v3.1.1';
 const STATIC_CACHE = `bar-organizer-static-${VERSION}`;
 const RUNTIME_CACHE = `bar-organizer-runtime-${VERSION}`;
 const IMAGE_CACHE = 'bar-organizer-images';   // kept across versions, size-limited
 const MAX_IMAGES = 150;
 
 // Must succeed for the install to succeed
-const CORE_ASSETS = ['./', './index.html', './app.js'];
+const CORE_ASSETS = ['./', './index.html', './app.js?v=3.1.1'];
 
 // Best effort (install does not fail if one of these is missing)
 const OPTIONAL_ASSETS = [
@@ -82,7 +82,21 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Own files (app.js, icons, manifest): stale-while-revalidate so updates arrive on the next load
+    // Own code (JS/HTML/manifest): network first so page and script always match; cache only as offline fallback
+    if (sameOrigin && !/\.(png|jpe?g|svg|webp|ico)$/i.test(url.pathname)) {
+        event.respondWith((async () => {
+            try {
+                const res = await fetch(req, { cache: 'no-cache' });
+                if (res.ok) { const c = await caches.open(STATIC_CACHE); c.put(req, res.clone()); }
+                return res;
+            } catch {
+                return (await caches.match(req)) || new Response('', { status: 504 });
+            }
+        })());
+        return;
+    }
+
+    // Own images (icons): stale-while-revalidate
     if (sameOrigin) {
         event.respondWith((async () => {
             const cached = await caches.match(req);
