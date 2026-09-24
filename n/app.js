@@ -49,7 +49,7 @@ let currentRecipePopupDrinkId = null;
 let prefs = loadPrefs();
 let selectMode = false;
 const selectedDrinks = new Set();
-const emptyFilters = () => ({ tags: [], tagMode: 'all', glass: '', include: [], exclude: [], maxIngredients: 0, image: 'any', completeness: 'any', recent: 0 });
+const emptyFilters = () => ({ tags: [], tagMode: 'all', glass: '', include: [], exclude: [], maxIngredients: 0, image: 'any', completeness: 'any', recent: 0, makeable: false });
 let filters = emptyFilters();
 let extensionsLoaded = false;
 
@@ -57,6 +57,10 @@ function loadPrefs() {
     const d = { view: 'grid', sort: 'name', showImages: true, clampRecipe: true, searchAll: false, lastCategory: null };
     try { return { ...d, ...JSON.parse(localStorage.getItem('barPrefs') || '{}') }; } catch { return d; }
 }
+function readLocal(key, fallback) {
+    try { const v = JSON.parse(localStorage.getItem(key)); return v && typeof v === 'object' ? v : fallback; } catch { return fallback; }
+}
+function writeLocal(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ } }
 function savePrefs() { try { localStorage.setItem('barPrefs', JSON.stringify(prefs)); } catch { /* ignore */ } }
 
 // ============================================================================
@@ -83,7 +87,7 @@ const perm = (k) => !!me?.permissions?.[k];
 const isEdit = () => mode === 'edit';
 const isStaff = () => mode === 'staff';
 
-const BLOCKING_CODES = ['account_disabled', 'not_registered', 'email_unverified', 'maintenance', 'session_expired', 'password_change_required'];
+const BLOCKING_CODES = ['account_disabled', 'not_registered', 'email_unverified', 'maintenance', 'session_expired', 'password_change_required', 'guests_disabled', 'guest_expired'];
 class ApiError extends Error { constructor(code, message, status) { super(message); this.code = code; this.status = status; } }
 
 // ============================================================================
@@ -193,13 +197,32 @@ async function withBusy(btn, fn) {
 // ============================================================================
 // API
 // ============================================================================
+// ---- Guest session (no account; token issued by the worker, kept for this tab only) ----
+let guestToken = null;
+try { guestToken = sessionStorage.getItem('barGuest'); } catch { /* ignore */ }
+const isGuest = () => !auth.currentUser && !!guestToken;
+function setGuestToken(t) {
+    guestToken = t;
+    try { if (t) sessionStorage.setItem('barGuest', t); else sessionStorage.removeItem('barGuest'); } catch { /* ignore */ }
+}
+async function authHeader() {
+    if (auth.currentUser) return `Bearer ${await auth.currentUser.getIdToken()}`;
+    if (guestToken) return `Guest ${guestToken}`;
+    throw new ApiError('no_token', 'Nicht angemeldet.', 401);
+}
+async function renewGuest() {
+    try {
+        const r = await fetch(`${WORKER_URL}/api/guest`, { method: 'POST', cache: 'no-store' });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.token) { setGuestToken(d.token); return true; }
+    } catch { /* ignore */ }
+    return false;
+}
+
 async function api(path, { method = 'GET', body, authed = true, retry = true } = {}) {
     const headers = {};
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    if (authed) {
-        if (!auth.currentUser) throw new ApiError('no_token', 'Nicht angemeldet.', 401);
-        headers.Authorization = `Bearer ${await auth.currentUser.getIdToken()}`;
-    }
+    if (authed) headers.Authorization = await authHeader();
     let res;
     try {
         res = await fetch(WORKER_URL + path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined, cache: 'no-store' });
@@ -209,6 +232,9 @@ async function api(path, { method = 'GET', body, authed = true, retry = true } =
     const data = await res.json().catch(() => ({}));
     if (res.status === 401 && authed && retry && auth.currentUser) {
         await auth.currentUser.getIdToken(true).catch(() => {});
+        return api(path, { method, body, authed, retry: false });
+    }
+    if (res.status === 401 && authed && retry && isGuest() && data.error === 'guest_expired' && await renewGuest()) {
         return api(path, { method, body, authed, retry: false });
     }
     if (!res.ok) {
@@ -277,6 +303,7 @@ async function loadPublicConfig() {
     try {
         const cfg = await api('/api/public-config', { authed: false });
         $('registerLinkWrap').classList.toggle('hidden', !cfg.registrationEnabled);
+        $('guestBtn').classList.toggle('hidden', !cfg.guestsEnabled);
         minPwLength = cfg.minPasswordLength || 8;
         $('regPwHint').textContent = `Mindestens ${minPwLength} Zeichen.${cfg.allowedEmailDomains?.length ? ` Nur Adressen von ${cfg.allowedEmailDomains.join(', ')}.` : ''}`;
         if (cfg.barName) $('authTitle').textContent = cfg.barName;
@@ -304,6 +331,17 @@ $('forcePwForm').addEventListener('submit', async (e) => {
     });
 });
 $('forcePwLogout').addEventListener('click', () => logout());
+$('guestBtn').addEventListener('click', (e) => withBusy(e.currentTarget, async () => {
+    $('loginError').classList.add('hidden');
+    try {
+        const d = await api('/api/guest', { method: 'POST', authed: false });
+        setGuestToken(d.token);
+        bootApp();
+    } catch (err) {
+        showFormError('loginError', err.message);
+        loadPublicConfig();
+    }
+}));
 
 $('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -385,6 +423,11 @@ $('forgotForm').addEventListener('submit', async (e) => {
 let blockedHandling = false;
 async function handleBlocked(err) {
     stopStream();
+    if (isGuest() && (err.code === 'guests_disabled' || err.code === 'guest_expired' || err.code === 'maintenance')) {
+        await logout();
+        showFormError('loginError', err.message);
+        return;
+    }
     if (err.code === 'session_expired') {
         if (blockedHandling) return;
         blockedHandling = true;
@@ -455,17 +498,29 @@ async function resendVerification(btn) {
 }
 
 async function logout() {
+    const wasGuest = isGuest();
+    setGuestToken(null);
     stopStream();
     stopVerifyWatch();
     setSelectMode(false);
     closeAllMenus();
     modalStack.slice().forEach((m) => closeModal(m, true));
     try { sessionStorage.removeItem('barMode'); } catch { /* ignore */ }
+    if (wasGuest) {
+        resetAppState();
+        loadPublicConfig();
+        showScreen('auth');
+        showAuthView('login');
+        return;
+    }
     await signOut(auth).catch(() => {});
 }
 
 onAuthStateChanged(auth, (user) => {
     if (user) {
+        setGuestToken(null);   // a real login always replaces a guest session
+        bootApp();
+    } else if (guestToken) {
         bootApp();
     } else {
         resetAppState();
@@ -496,7 +551,7 @@ async function bootApp() {
             $('loadingIndicator').classList.add('hidden');
             $('noCategoriesMessage').textContent = `${e.message}`;
             $('noCategoriesMessage').classList.remove('hidden');
-            setTimeout(() => { if (auth.currentUser && !initialLoadComplete) bootApp(); }, 8000);
+            setTimeout(() => { if ((auth.currentUser || guestToken) && !initialLoadComplete) bootApp(); }, 8000);
         }
     }
 }
@@ -535,6 +590,12 @@ function applyState(s) {
     tagMeta = s.data.tagMeta || {};
     currentRev = s.data.rev ?? null;
     me.favorites = me.favorites || {};
+    me.inventory = Array.isArray(me.inventory) ? me.inventory : [];
+    if (me.isGuest) {
+        // Guests have no account: personal lists live on this device only.
+        me.favorites = readLocal('barGuestFav', {});
+        me.inventory = readLocal('barGuestInv', []);
+    }
 
     // Mode handling: restore from session, drop modes the role no longer has
     if (!initialLoadComplete) {
@@ -563,13 +624,13 @@ function applyState(s) {
 
     // Drop selections/filters that no longer exist
     for (const id of [...selectedDrinks]) if (!allDrinks[id]) selectedDrinks.delete(id);
-    if (mode !== 'edit' && selectMode) setSelectMode(false);
 
     $('loadingIndicator').classList.add('hidden');
     $('noCategoriesMessage').classList.toggle('hidden', Object.keys(allCategories).length > 0);
     updateUserUI();
+    updateInventoryBadge();
     renderAnnouncement();
-    if (!me.emailVerified && !verifyTimer) startVerifyWatch({ onVerified: () => refreshState() });
+    if (!me.isGuest && !me.emailVerified && !verifyTimer) startVerifyWatch({ onVerified: () => refreshState() });
     if (!$('tagModal').classList.contains('hidden')) renderTagList();
     updateActiveModesUI();
     if (!$('ingredientEditorModal').classList.contains('hidden')) renderIngredientEditor();
@@ -602,14 +663,13 @@ function stopStream() {
 
 async function startStream() {
     stopStream();
-    if (!auth.currentUser) return;
+    if (!auth.currentUser && !guestToken) return;
     const ctrl = new AbortController();
     streamCtrl = ctrl;
     // Fallback polling while the stream is not connected
     pollTimer = setInterval(() => { if (document.visibilityState === 'visible') refreshState(); }, 60000);
     try {
-        const token = await auth.currentUser.getIdToken();
-        const res = await fetch(`${WORKER_URL}/api/stream`, { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal, cache: 'no-store' });
+        const res = await fetch(`${WORKER_URL}/api/stream`, { headers: { Authorization: await authHeader() }, signal: ctrl.signal, cache: 'no-store' });
         if (!res.ok || !res.body) throw new Error(`stream ${res.status}`);
         setLive('live');
         streamRetry = 1000;
@@ -648,17 +708,17 @@ async function startStream() {
     }
     if (streamCtrl !== ctrl) return;
     setLive(navigator.onLine ? 'connecting' : 'offline');
-    streamTimer = setTimeout(() => { if (auth.currentUser) startStream(); }, streamRetry);
+    streamTimer = setTimeout(() => { if (auth.currentUser || guestToken) startStream(); }, streamRetry);
     streamRetry = Math.min(streamRetry * 2, 30000);
 }
 
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && auth.currentUser && initialLoadComplete) {
+    if (document.visibilityState === 'visible' && (auth.currentUser || guestToken) && initialLoadComplete) {
         refreshState();
         if (!streamCtrl) startStream();
     }
 });
-window.addEventListener('online', () => { if (auth.currentUser) { refreshState(); startStream(); } });
+window.addEventListener('online', () => { if (auth.currentUser || guestToken) { refreshState(); startStream(); } });
 window.addEventListener('offline', () => setLive('offline'));
 window.addEventListener('app-updated', () => toast('Eine neue Version ist verfügbar.', 'info', { action: { label: 'Neu laden', onClick: () => location.reload() } }));
 
@@ -736,8 +796,11 @@ function roleChip(role) {
     return `<span class="chip" style="background:${c}22;color:${c};box-shadow:inset 0 0 0 1px ${c}55">${esc(role?.name || 'Standard')}</span>`;
 }
 
+const SETTINGS_PERM_KEYS = ['settingsBarName', 'settingsAnnouncements', 'settingsAccounts', 'settingsSecurity', 'settingsMaintenance', 'settingsAudit'];
+const anySettingsPerm = () => SETTINGS_PERM_KEYS.some(perm);
 function hasPanelAccess() {
-    return ['admin', 'manageUsers', 'disableUsers', 'deleteUsers', 'resetPasswords', 'manageRoles', 'manageSettings', 'viewAudit', 'exportData', 'importData'].some(perm);
+    if (me?.isGuest) return false;
+    return ['admin', 'manageUsers', 'disableUsers', 'deleteUsers', 'resetPasswords', 'manageRoles', 'manageSettings', 'viewAudit', 'exportData', 'importData'].some(perm) || anySettingsPerm();
 }
 
 function updateUserUI() {
@@ -746,15 +809,19 @@ function updateUserUI() {
     const ini = initials(name);
     ['userMenuBtn', 'profileAvatar'].forEach((id) => { $(id).textContent = ini; });
     $('userMenuBtn').style.background = safeColor(me.role?.color || '#4f46e5');
-    $('userMenuName').textContent = name;
-    $('userMenuEmail').textContent = me.email;
+    $('userMenuName').textContent = me.isGuest ? 'Gast' : name;
+    $('userMenuEmail').textContent = me.isGuest ? 'Nicht angemeldet' : me.email;
+    $('menuProfileBtn').classList.toggle('hidden', !!me.isGuest);
+    $('menuLogoutBtn').innerHTML = me.isGuest
+        ? '<i class="fas fa-right-to-bracket w-4 text-center"></i> Anmelden'
+        : '<i class="fas fa-right-from-bracket w-4 text-center"></i> Abmelden';
+    if (me.isGuest) $('userMenuBtn').innerHTML = '<i class="fas fa-user-clock"></i>';
     $('userMenuRole').innerHTML = roleChip(me.role);
     $('menuUsersBtn').classList.toggle('hidden', !hasPanelAccess());
-    $('verifyBanner').classList.toggle('hidden', !!me.emailVerified);
+    $('verifyBanner').classList.toggle('hidden', !!me.emailVerified || !!me.isGuest);
     const title = serverSettings.barName || 'Bar Organizer';
     $('appTitle').textContent = title;
     document.title = serverSettings.barName ? `${serverSettings.barName} – Bar Organizer` : 'Bar Organizer Deluxe';
-    $('selectModeBtn').classList.toggle('hidden', !isEdit());
 }
 
 function renderAnnouncement() {
@@ -766,7 +833,7 @@ function renderAnnouncement() {
     try { key = localStorage.getItem('barAnnDismissed') || ''; } catch { /* ignore */ }
     const parts = [];
     const styles = { info: 'bg-indigo-50 text-indigo-900 dark:bg-indigo-950/60 dark:text-indigo-100', warning: 'bg-amber-50 text-amber-900 dark:bg-amber-950/60 dark:text-amber-100', success: 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-100' };
-    if (maint) parts.push(`<div class="flex items-center gap-2 px-4 py-2 text-sm ${styles.warning}"><i class="fas fa-screwdriver-wrench"></i><span>Wartungsmodus ist aktiv – nur Administratoren haben Zugriff.</span></div>`);
+    if (maint) parts.push(`<div class="flex items-center gap-2 px-4 py-2 text-sm ${styles.warning}"><i class="fas fa-screwdriver-wrench"></i><span>Wartungsmodus ist aktiv – nur berechtigte Benutzer haben Zugriff.</span></div>`);
     if (locked) parts.push(`<div class="flex items-center gap-2 px-4 py-2 text-sm ${styles.warning}"><i class="fas fa-lock"></i><span>Die Bearbeitung ist derzeit gesperrt.</span></div>`);
     if (text && key !== text) {
         const lvl = styles[serverSettings.announcementLevel] ? serverSettings.announcementLevel : 'info';
@@ -798,7 +865,7 @@ function addMenuItem({ label, icon, onClick }) {
     $('menuExtSlot').appendChild(b);
 }
 async function loadExtensions() {
-    if (extensionsLoaded || !auth.currentUser) return;
+    if (extensionsLoaded || !auth.currentUser) return;   // never for guests
     extensionsLoaded = true;
     try {
         const token = await auth.currentUser.getIdToken();
@@ -847,8 +914,7 @@ function updateActiveModesUI() {
     styleModeButton($('modalEditModeButton'), isEdit(), { on: 'Bearbeitungsmodus verlassen', off: 'Bearbeitungsmodus aktivieren', iconOn: 'fa-lock-open', iconOff: 'fa-pen-ruler', color: 'bg-amber-500 text-white hover:bg-amber-600' });
     styleModeButton($('modalStaffModeButton'), isStaff(), { on: 'Personal Modus verlassen', off: 'Personal Modus aktivieren', iconOn: 'fa-user-shield', iconOff: 'fa-user-tie', color: 'bg-violet-600 text-white hover:bg-violet-700' });
     $('dataManagementSection').classList.toggle('hidden', !isEdit());
-    if (!isEdit() && selectMode) setSelectMode(false);
-    $('selectModeBtn').classList.toggle('hidden', !isEdit());
+    if (selectMode) updateBulkBar();
 
     const status = $('headerModeStatus');
     if (mode === 'view') status.classList.add('hidden');
@@ -997,12 +1063,13 @@ function passesFilters(id, d) {
     if (f.completeness === 'complete' && !complete) return false;
     if (f.completeness === 'incomplete' && complete) return false;
     if (f.recent && !((d.updatedAt || d.createdAt || 0) > Date.now() - f.recent * 86400000)) return false;
+    if (f.makeable && coverage(d)?.pct !== 100) return false;
     return true;
 }
 function activeFilterCount() {
     const f = filters;
     return f.tags.length + (f.glass ? 1 : 0) + f.include.length + f.exclude.length + (f.maxIngredients ? 1 : 0)
-        + (f.image !== 'any' ? 1 : 0) + (f.completeness !== 'any' ? 1 : 0) + (f.recent ? 1 : 0);
+        + (f.image !== 'any' ? 1 : 0) + (f.completeness !== 'any' ? 1 : 0) + (f.recent ? 1 : 0) + (f.makeable ? 1 : 0);
 }
 
 function getVisibleDrinks() {
@@ -1025,6 +1092,11 @@ function getVisibleDrinks() {
         case 'favorites': list.sort((x, y) => fav(y[0]) - fav(x[0]) || nameCmp(x, y)); break;
         case 'ingredients': list.sort(([, a], [, b]) => (a.ingredients || []).length - (b.ingredients || []).length || nameCmp([, a], [, b])); break;
         default: list.sort(nameCmp);
+    }
+    if (inventoryActive()) {
+        // Stable sort: most available ingredients first, previous order as tie-breaker.
+        const pct = (d) => coverage(d)?.pct ?? -1;
+        list.sort(([, a], [, b]) => pct(b) - pct(a));
     }
     return { list, acrossAll };
 }
@@ -1190,6 +1262,7 @@ function buildDrinkCard(id, drink, showFolder) {
                     <h3 class="font-display text-xl font-bold leading-tight text-gray-900 dark:text-white sm:text-2xl">${esc(drink.name)} <span class="text-lg">${esc(drink.symbols || '')}</span></h3>
                     <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
                         ${typePill(drink.type)}
+                        ${coverageChip(drink)}
                         ${drink.glass ? `<span class="chip bg-gray-100 text-gray-600 dark:bg-plum-800 dark:text-gray-300"><i class="fas fa-whiskey-glass"></i>${esc(drink.glass)}</span>` : ''}
                         ${showFolder ? `<span class="chip bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200"><i class="fas fa-folder"></i>${esc(allCategories[drink.categoryId]?.name || '')}</span>` : ''}
                     </div>
@@ -1223,7 +1296,7 @@ function buildDrinkRow(id, drink, showFolder) {
     row.innerHTML = `
         ${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="h-11 w-11 flex-shrink-0 rounded-lg object-cover">` : `<span class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-lg dark:bg-plum-800">${esc((drink.symbols || '').slice(0, 2)) || '🍸'}</span>`}
         <div class="min-w-0 flex-1 cursor-pointer open-recipe-area">
-            <div class="flex items-center gap-2"><h3 class="truncate font-semibold text-gray-900 dark:text-white">${esc(drink.name)}</h3>${typePill(drink.type)}${showFolder ? `<span class="chip hidden bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 sm:inline-flex">${esc(allCategories[drink.categoryId]?.name || '')}</span>` : ''}</div>
+            <div class="flex items-center gap-2"><h3 class="truncate font-semibold text-gray-900 dark:text-white">${esc(drink.name)}</h3>${typePill(drink.type)}${coverageChip(drink)}${showFolder ? `<span class="chip hidden bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 sm:inline-flex">${esc(allCategories[drink.categoryId]?.name || '')}</span>` : ''}</div>
             <p class="truncate text-xs text-gray-500 dark:text-gray-400">${esc((drink.ingredients || []).map((i) => i.item).join(', ') || 'Keine Zutaten')}${(drink.tags || []).length ? ` · ${drink.tags.map((t) => `#${esc(t)}`).join(' ')}` : ''}</p>
         </div>
         <div class="flex flex-shrink-0 items-center gap-1">${selectMode ? selectBox(id) : drinkActionButtons(id, drink) + favButton(id)}</div>`;
@@ -1288,7 +1361,7 @@ $('favFilterBtn').addEventListener('click', () => {
     favOnly = !favOnly;
     const b = $('favFilterBtn');
     b.setAttribute('aria-pressed', String(favOnly));
-    b.className = `btn btn-sm ${favOnly ? 'bg-zest-400 text-plum-950 hover:bg-zest-500' : 'btn-secondary'}`;
+    b.className = `btn btn-sm h-9 flex-shrink-0 ${favOnly ? 'bg-zest-400 text-plum-950 hover:bg-zest-500' : 'btn-secondary'}`;
     b.innerHTML = `<i class="${favOnly ? 'fas' : 'far'} fa-star"></i><span class="hidden sm:inline">Favoriten</span>`;
     filterAndRenderDrinks();
 });
@@ -1315,6 +1388,7 @@ async function toggleFavorite(id) {
     if (on) me.favorites[id] = true; else delete me.favorites[id];
     filterAndRenderDrinks();
     if (currentRecipePopupDrinkId === id) updatePopupFav();
+    if (me.isGuest) { writeLocal('barGuestFav', me.favorites); return; }
     try { await api('/api/action', { method: 'POST', body: { action: 'toggleFavorite', drinkId: id, on } }); }
     catch (e) {
         if (on) delete me.favorites[id]; else me.favorites[id] = true;
@@ -1368,8 +1442,9 @@ function showRecipePopup(drinkId, { keepServings = false } = {}) {
 
     const renderBody = () => {
         const ings = drink.ingredients || [];
+        const cov = (me?.inventory || []).length ? coverage(drink, popupServings) : null;
         const ingredientsHtml = ings.length
-            ? `<ul class="space-y-1 text-base">${ings.map((i) => `<li class="flex gap-3"><span class="w-24 flex-shrink-0 text-right font-semibold tabular-nums text-gray-900 dark:text-white">${esc(scaleAmount(i.amount, popupServings))}</span><span>${esc(i.item)}</span></li>`).join('')}</ul>`
+            ? `<ul class="space-y-1 text-base">${ings.map((i, idx) => `<li class="flex gap-3"><span class="w-24 flex-shrink-0 text-right font-semibold tabular-nums text-gray-900 dark:text-white">${esc(scaleAmount(i.amount, popupServings))}</span><span class="flex-1">${esc(i.item)}</span>${invMark(cov?.detail[idx])}</li>`).join('')}</ul>`
             : '<p class="text-sm text-gray-500">Keine Zutaten gelistet.</p>';
         const updated = drink.updatedAt ? `Zuletzt bearbeitet ${relTime(drink.updatedAt)}${drink.updatedByName ? ` von ${esc(drink.updatedByName)}` : ''}` : (drink.createdAt ? `Angelegt ${relTime(drink.createdAt)}${drink.createdByName ? ` von ${esc(drink.createdByName)}` : ''}` : '');
         $('recipePopupContent').innerHTML = `
@@ -1600,6 +1675,7 @@ function openDrinkModal(id = null, catIdForNew = null, isStaffNewRecipe = false,
     else if (!sortedCategoryEntries().length) return showCustomAlert('Es muss mindestens ein Ordner existieren.');
     toggleRequiredFields($('allowEmptyFieldsToggle').checked);
     updateImagePreview();
+    renderLinkHint(id);
     if (ingredientSortable) ingredientSortable.destroy();
     if (typeof Sortable !== 'undefined') ingredientSortable = new Sortable($('ingredientsContainer'), { animation: 150, handle: '.ing-handle', ghostClass: 'sortable-ghost' });
     openModal($('drinkModal'));
@@ -1608,6 +1684,8 @@ function openDrinkModal(id = null, catIdForNew = null, isStaffNewRecipe = false,
 
 $('drinkForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const scope = pendingSaveScope;   // read & reset first, so a failed validation can't leave it set
+    pendingSaveScope = 'all';
     const id = $('drinkId').value;
     const staffTarget = $('drinkModalTargetCategoryId').value;
     const categoryId = staffTarget || $('drinkCategory').value;
@@ -1644,11 +1722,11 @@ $('drinkForm').addEventListener('submit', async (e) => {
     };
     if (!drink.tags) return;
     const actionMode = staffTarget && isStaff() ? 'staff' : 'edit';
-    await withBusy($('drinkSaveBtn'), async () => {
-        const res = await act('saveDrink', { id: id || undefined, drink, quick }, { modeOverride: actionMode });
+    await withBusy(scope === 'this' ? $('drinkSaveThisBtn') : $('drinkSaveBtn'), async () => {
+        const res = await act('saveDrink', { id: id || undefined, drink, quick, scope }, { modeOverride: actionMode });
         if (res) {
             closeModal($('drinkModal'), true);
-            toast(id ? 'Drink gespeichert.' : `„${name}" angelegt.`, 'success');
+            toast(!id ? `„${name}" angelegt.` : res.updated > 1 ? `In ${res.updated} Ordnern gespeichert.` : 'Drink gespeichert.', 'success');
         }
     });
 });
@@ -1961,7 +2039,14 @@ const PERM_DEFS = [
     ['deleteUsers', 'Benutzer löschen', 'Konten endgültig löschen.'],
     ['resetPasswords', 'Passwörter festlegen', 'Neue Passwörter für andere Benutzer setzen.'],
     ['manageRoles', 'Rollen verwalten', 'Rollen unterhalb der eigenen erstellen und bearbeiten – nur mit eigenen Rechten.'],
-    ['manageSettings', 'App-Einstellungen', 'Registrierung, Wartungsmodus, Ankündigungen, Sicherheit.'],
+    ['manageSettings', 'Alle App-Einstellungen', 'Schließt alle einzelnen App-Rechte darunter ein.'],
+    ['settingsBarName', 'App: Name der Bar', 'Namen im Kopfbereich und auf der Anmeldeseite ändern.'],
+    ['settingsAnnouncements', 'App: Ankündigungen', 'Ankündigungen veröffentlichen und entfernen.'],
+    ['settingsAccounts', 'App: Konten & Registrierung', 'Registrierung, Gastzugang, E-Mail-Bestätigung, erlaubte Domains.'],
+    ['settingsSecurity', 'App: Sicherheit', 'Passwort-Mindestlänge und automatische Abmeldung.'],
+    ['settingsMaintenance', 'App: Betrieb & Wartung', 'Wartungsmodus und Bearbeitungssperre – umgeht den Wartungsmodus.'],
+    ['bypassMaintenance', 'Wartungsmodus umgehen', 'Die App auch während der Wartung benutzen.'],
+    ['settingsAudit', 'App: Protokoll-Regeln', 'Protokoll-Limit und was protokolliert wird.'],
     ['viewAudit', 'Protokoll einsehen', 'Wer hat wann was geändert.'],
     ['exportData', 'Daten exportieren', 'Sicherung als JSON herunterladen.'],
     ['importData', 'Daten importieren', 'Sicherungen zusammenführen (überschreibt nie).'],
@@ -2055,7 +2140,7 @@ async function openUsersPanel() {
     const tabs = {
         users: USER_PERM_KEYS.some(perm),
         roles: true,
-        settings: perm('manageSettings'),
+        settings: anySettingsPerm(),
         audit: perm('viewAudit'),
         data: perm('exportData') || perm('importData'),
     };
@@ -2103,7 +2188,7 @@ function renderAdmin() {
     $('statsGrid').innerHTML = [['Benutzer', st.users, 'fa-users'], ['Ordner', st.categories, 'fa-folder'], ['Drinks', st.drinks, 'fa-martini-glass-citrus'], ['Zutaten', st.ingredients, 'fa-lemon']]
         .filter(([, v]) => v !== null && v !== undefined)
         .map(([l, v, i]) => `<div class="rounded-xl bg-gray-50 p-4 dark:bg-plum-800/60"><i class="fas ${i} text-indigo-500"></i><p class="mt-2 font-display text-2xl font-bold">${Number(v) || 0}</p><p class="hint">${l}</p></div>`).join('');
-    if (perm('manageSettings')) renderAppSettings();
+    if (anySettingsPerm()) renderAppSettings();
 }
 
 // ---- App settings (manageSettings) ----
@@ -2115,41 +2200,42 @@ function renderAppSettings() {
             <input type="checkbox" class="check flex-shrink-0" data-set="${key}" ${s[key] ? 'checked' : ''}>
         </label>`;
     const card = (title, icon, inner) => `<section class="rounded-xl border border-gray-100 p-4 dark:border-plum-800"><p class="mb-2 flex items-center gap-2 font-display text-base font-bold"><i class="fas ${icon} text-indigo-500"></i>${title}</p>${inner}</section>`;
-    $('appSettingsForm').innerHTML = [
-        card('Allgemein', 'fa-store', `
+    const cards = [];
+    if (perm('settingsBarName')) cards.push(card('Allgemein', 'fa-store', `
             <label class="label" for="setBarName">Name der Bar</label>
             <div class="flex gap-2"><input id="setBarName" maxlength="40" class="input" value="${esc(s.barName)}" placeholder="Bar Organizer"><button class="btn btn-secondary" data-save="barName">Speichern</button></div>
-            <p class="hint mt-1">Erscheint im Kopfbereich und auf der Anmeldeseite.</p>`),
-        card('Ankündigung', 'fa-bullhorn', `
+            <p class="hint mt-1">Erscheint im Kopfbereich und auf der Anmeldeseite.</p>`));
+    if (perm('settingsAnnouncements')) cards.push(card('Ankündigung', 'fa-bullhorn', `
             <textarea id="setAnnText" rows="2" maxlength="300" class="input" placeholder="z. B. Heute Abend Happy Hour – Mojitos zum halben Preis">${esc(s.announcementText)}</textarea>
             <div class="mt-2 flex flex-wrap items-center gap-2">
                 <select id="setAnnLevel" class="input w-auto">${[['info', 'Info'], ['warning', 'Warnung'], ['success', 'Erfolg']].map(([v, l]) => `<option value="${v}" ${s.announcementLevel === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
                 <button class="btn btn-secondary" data-save="announcement">Veröffentlichen</button>
                 ${s.announcementText ? '<button class="btn btn-ghost text-rose-600" data-save="announcementClear">Entfernen</button>' : ''}
             </div>
-            <p class="hint mt-1">Wird allen angemeldeten Benutzern oben angezeigt, bis sie es ausblenden.</p>`),
-        card('Konten & Registrierung', 'fa-user-plus', `
+            <p class="hint mt-1">Wird allen angemeldeten Benutzern oben angezeigt, bis sie es ausblenden.</p>`));
+    if (perm('settingsAccounts')) cards.push(card('Konten & Registrierung', 'fa-user-plus', `
             ${toggle('registrationEnabled', 'Registrierung erlauben', 'Zeigt „Konto erstellen" auf der Anmeldeseite. Neue Konten erhalten die Standardrolle.')}
+            ${toggle('guestsEnabled', 'Gastzugang erlauben', 'Zeigt „Als Gast fortfahren". Gäste erhalten die Standardrolle (ohne Verwaltungsrechte), es wird kein Konto angelegt. Beim Ausschalten endet jeder Gastzugang sofort.')}
             ${toggle('requireEmailVerification', 'E-Mail-Bestätigung verlangen', 'Unbestätigte Konten erhalten keinen Zugriff (Administratoren ausgenommen).')}
             <label class="label mt-2" for="setDomains">Erlaubte E-Mail-Domains</label>
-            <div class="flex gap-2"><input id="setDomains" class="input" value="${esc((s.allowedEmailDomains || []).join(', '))}" placeholder="leer = alle, z. B. meinebar.de"><button class="btn btn-secondary" data-save="domains">Speichern</button></div>`),
-        card('Sicherheit', 'fa-shield-halved', `
+            <div class="flex gap-2"><input id="setDomains" class="input" value="${esc((s.allowedEmailDomains || []).join(', '))}" placeholder="leer = alle, z. B. meinebar.de"><button class="btn btn-secondary" data-save="domains">Speichern</button></div>`));
+    if (perm('settingsSecurity')) cards.push(card('Sicherheit', 'fa-shield-halved', `
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div><label class="label" for="setMinPw">Mindestlänge Passwort</label><select id="setMinPw" class="input">${[8, 10, 12, 14, 16, 20].map((n) => `<option ${s.minPasswordLength === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
                 <div><label class="label" for="setSession">Automatisch abmelden nach</label><select id="setSession" class="input">${[[0, 'Nie'], [8, '8 Stunden'], [24, '1 Tag'], [72, '3 Tagen'], [168, '7 Tagen'], [720, '30 Tagen']].map(([v, l]) => `<option value="${v}" ${s.sessionMaxHours === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
             </div>
-            <p class="hint mt-1">Die Mindestlänge gilt für Registrierung, neue Konten und gesetzte Passwörter.</p>`),
-        card('Betrieb', 'fa-screwdriver-wrench', `
-            ${toggle('lockEditing', 'Bearbeitung sperren', 'Nur Administratoren können Daten ändern. Favoriten bleiben möglich.')}
-            ${toggle('maintenanceMode', 'Wartungsmodus', 'Nur Administratoren können die App benutzen.')}
+            <p class="hint mt-1">Die Mindestlänge gilt für Registrierung, neue Konten und gesetzte Passwörter.</p>`));
+    if (perm('settingsMaintenance')) cards.push(card('Betrieb', 'fa-screwdriver-wrench', `
+            ${toggle('lockEditing', 'Bearbeitung sperren', 'Nur Administratoren können Daten ändern. Favoriten und Bestand bleiben möglich.')}
+            ${toggle('maintenanceMode', 'Wartungsmodus', 'Nur Administratoren und Benutzer mit Wartungs-Recht können die App benutzen. Gäste sind ausgesperrt.')}
             <label class="label mt-2" for="setMaintMsg">Text im Wartungsmodus</label>
-            <div class="flex gap-2"><input id="setMaintMsg" maxlength="300" class="input" value="${esc(s.maintenanceMessage)}" placeholder="Die App wird gerade gewartet."><button class="btn btn-secondary" data-save="maintMsg">Speichern</button></div>`),
-        card('Protokoll', 'fa-clipboard-list', `
+            <div class="flex gap-2"><input id="setMaintMsg" maxlength="300" class="input" value="${esc(s.maintenanceMessage)}" placeholder="Die App wird gerade gewartet."><button class="btn btn-secondary" data-save="maintMsg">Speichern</button></div>`));
+    if (perm('settingsAudit')) cards.push(card('Protokoll', 'fa-clipboard-list', `
             ${toggle('auditDataActions', 'Datenänderungen protokollieren', 'Löschen, Import, Massenaktionen usw. Benutzer- und Rollenänderungen werden immer protokolliert.')}
             <label class="label mt-2" for="setAuditLimit">Maximale Einträge</label>
             <select id="setAuditLimit" class="input w-auto">${[50, 100].map((n) => `<option ${s.auditLimit === n ? 'selected' : ''}>${n}</option>`).join('')}</select>
-            <p class="hint mt-1">Ältere Einträge werden automatisch gelöscht.</p>`),
-    ].join('');
+            <p class="hint mt-1">Ältere Einträge werden automatisch gelöscht.</p>`));
+    $('appSettingsForm').innerHTML = cards.join('');
 
     const form = $('appSettingsForm');
     const save = async (settings, btn, msg = 'Gespeichert.') => { if (await adminAct({ action: 'updateSettings', settings }, btn)) toast(msg, 'success'); };
@@ -2158,14 +2244,14 @@ function renderAppSettings() {
         if (k === 'maintenanceMode' && c.checked && !(await showConfirm('Alle Benutzer ohne Adminrechte verlieren sofort den Zugriff.', { title: 'Wartungsmodus aktivieren?', confirmLabel: 'Aktivieren' }))) { c.checked = false; return; }
         save({ [k]: c.checked });
     }));
-    form.querySelector('[data-save="barName"]').addEventListener('click', (e) => save({ barName: $('setBarName').value.trim() }, e.currentTarget));
-    form.querySelector('[data-save="announcement"]').addEventListener('click', (e) => save({ announcementText: $('setAnnText').value.trim(), announcementLevel: $('setAnnLevel').value }, e.currentTarget, 'Ankündigung veröffentlicht.'));
+    form.querySelector('[data-save="barName"]')?.addEventListener('click', (e) => save({ barName: $('setBarName').value.trim() }, e.currentTarget));
+    form.querySelector('[data-save="announcement"]')?.addEventListener('click', (e) => save({ announcementText: $('setAnnText').value.trim(), announcementLevel: $('setAnnLevel').value }, e.currentTarget, 'Ankündigung veröffentlicht.'));
     form.querySelector('[data-save="announcementClear"]')?.addEventListener('click', (e) => save({ announcementText: '' }, e.currentTarget, 'Ankündigung entfernt.'));
-    form.querySelector('[data-save="domains"]').addEventListener('click', (e) => save({ allowedEmailDomains: $('setDomains').value }, e.currentTarget));
-    form.querySelector('[data-save="maintMsg"]').addEventListener('click', (e) => save({ maintenanceMessage: $('setMaintMsg').value.trim() }, e.currentTarget));
-    $('setMinPw').addEventListener('change', (e) => save({ minPasswordLength: Number(e.target.value) }));
-    $('setSession').addEventListener('change', (e) => save({ sessionMaxHours: Number(e.target.value) }));
-    $('setAuditLimit').addEventListener('change', (e) => save({ auditLimit: Number(e.target.value) }));
+    form.querySelector('[data-save="domains"]')?.addEventListener('click', (e) => save({ allowedEmailDomains: $('setDomains').value }, e.currentTarget));
+    form.querySelector('[data-save="maintMsg"]')?.addEventListener('click', (e) => save({ maintenanceMessage: $('setMaintMsg').value.trim() }, e.currentTarget));
+    $('setMinPw')?.addEventListener('change', (e) => save({ minPasswordLength: Number(e.target.value) }));
+    $('setSession')?.addEventListener('change', (e) => save({ sessionMaxHours: Number(e.target.value) }));
+    $('setAuditLimit')?.addEventListener('change', (e) => save({ auditLimit: Number(e.target.value) }));
 }
 $('userSearchInput').addEventListener('input', renderUsersList);
 $('userRoleFilter').addEventListener('change', renderUsersList);
@@ -2640,7 +2726,11 @@ function renderFilterBody() {
             <div><p class="label">Bild</p>${segHtml('image', [['any', 'Egal'], ['with', 'Mit'], ['without', 'Ohne']], f.image)}</div>
             <div><p class="label">Rezept</p>${segHtml('completeness', [['any', 'Egal'], ['complete', 'Vollständig'], ['incomplete', 'Lückenhaft']], f.completeness)}</div>
         </div>
-        <div><p class="label">Neu oder geändert</p>${segHtml('recent', [[0, 'Egal'], [1, 'Heute'], [7, '7 Tage'], [30, '30 Tage']], f.recent)}</div>`;
+        <div><p class="label">Neu oder geändert</p>${segHtml('recent', [[0, 'Egal'], [1, 'Heute'], [7, '7 Tage'], [30, '30 Tage']], f.recent)}</div>
+        <label class="flex items-center justify-between gap-3 rounded-lg bg-emerald-50 px-3 py-2.5 text-sm dark:bg-emerald-950/40">
+            <span><span class="block font-semibold">Nur mit meinem Bestand machbar</span><span class="hint">${(me?.inventory || []).length ? 'Alle Zutaten sind vorhanden (100 %).' : 'Lege zuerst deinen Bestand an.'}</span></span>
+            <input id="fMakeable" type="checkbox" class="check flex-shrink-0" ${f.makeable ? 'checked' : ''} ${(me?.inventory || []).length ? '' : 'disabled'}>
+        </label>`;
     const body = $('filterBody');
     body.querySelectorAll('[data-ftag]').forEach((b) => b.addEventListener('click', () => {
         const t = b.dataset.ftag;
@@ -2663,6 +2753,7 @@ function renderFilterBody() {
     ['fInclude', 'fExclude'].forEach((id) => $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addIng(id === 'fInclude' ? 'include' : 'exclude'); } }));
     $('fGlass').addEventListener('change', (e) => { f.glass = e.target.value; });
     $('fMax').addEventListener('change', (e) => { f.maxIngredients = Number(e.target.value); });
+    $('fMakeable').addEventListener('change', (e) => { f.makeable = e.target.checked; });
 }
 $('filterApplyBtn').addEventListener('click', () => { filters = filterDraft; closeModal($('filterModal'), true); filterAndRenderDrinks(); });
 $('filterResetBtn').addEventListener('click', () => { filterDraft = emptyFilters(); renderFilterBody(); });
@@ -2684,6 +2775,7 @@ function renderActiveFilters() {
     if (f.image !== 'any') chip(f.image === 'with' ? 'Mit Bild' : 'Ohne Bild', () => { f.image = 'any'; });
     if (f.completeness !== 'any') chip(f.completeness === 'complete' ? 'Rezept vollständig' : 'Rezept lückenhaft', () => { f.completeness = 'any'; });
     if (f.recent) chip(f.recent === 1 ? 'Heute geändert' : `Letzte ${f.recent} Tage`, () => { f.recent = 0; });
+    if (f.makeable) chip('Mit Bestand machbar', () => { f.makeable = false; });
     box.classList.toggle('hidden', !chips.length);
     box.classList.toggle('flex', !!chips.length);
     box.innerHTML = '';
@@ -2760,11 +2852,11 @@ function renderTagList() {
 // Bulk selection (edit mode)
 // ============================================================================
 function setSelectMode(on) {
-    selectMode = !!on && isEdit();
+    selectMode = !!on;
     if (!selectMode) selectedDrinks.clear();
     const b = $('selectModeBtn');
-    b.className = `btn btn-sm flex-shrink-0 ${selectMode ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'btn-secondary'} ${isEdit() ? '' : 'hidden'}`;
-    b.innerHTML = selectMode ? '<i class="fas fa-xmark"></i> Auswahl beenden' : '<i class="far fa-square-check"></i> Auswählen';
+    b.className = `btn btn-sm h-9 ${selectMode ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'btn-secondary'}`;
+    b.innerHTML = selectMode ? '<i class="fas fa-xmark"></i> Beenden' : '<i class="far fa-square-check"></i> Auswählen';
     if (initialLoadComplete) filterAndRenderDrinks();
     updateBulkBar();
 }
@@ -2784,7 +2876,8 @@ function updateBulkBar() {
     $('mainArea').style.paddingBottom = show ? '7rem' : '';
     $('toastContainer').style.bottom = show ? 'calc(env(safe-area-inset-bottom) + 5.5rem)' : '';
     $('bulkCount').innerHTML = `${selectedDrinks.size}<span class="hidden sm:inline"> ausgewählt</span>`;
-    ['bulkMoveBtn', 'bulkCopyBtn', 'bulkTagBtn', 'bulkTypeBtn', 'bulkDeleteBtn'].forEach((id) => { $(id).disabled = !selectedDrinks.size; });
+    ['bulkTotalsBtn', 'bulkMoveBtn', 'bulkCopyBtn', 'bulkTagBtn', 'bulkTypeBtn', 'bulkDeleteBtn'].forEach((id) => { $(id).disabled = !selectedDrinks.size; });
+    document.querySelectorAll('.bulk-edit-only').forEach((b) => b.classList.toggle('hidden', !isEdit()));
     const allOn = lastVisibleIds.length && lastVisibleIds.every((id) => selectedDrinks.has(id));
     $('bulkAllBtn').textContent = allOn ? 'Keine' : 'Alle';
 }
@@ -2846,4 +2939,296 @@ $('recipePopupCopyBtn').addEventListener('click', async () => {
     if ((d.tags || []).length) lines.push('', d.tags.map((t) => `#${t}`).join(' '));
     try { await navigator.clipboard.writeText(lines.join('\n')); toast('Rezept kopiert.', 'success'); }
     catch { toast('Kopieren wird von diesem Browser nicht unterstützt.', 'error'); }
+});
+
+// ============================================================================
+// Amounts: parse "2 cl", "1/2 l", "8-10", "2,5 cl" … into comparable quantities
+// ============================================================================
+const UNITS = {
+    ml: ['ml', 1], cl: ['ml', 10], dl: ['ml', 100], l: ['ml', 1000], ltr: ['ml', 1000], liter: ['ml', 1000], oz: ['ml', 29.57],
+    g: ['g', 1], gr: ['g', 1], gramm: ['g', 1], kg: ['g', 1000],
+    '': ['stk', 1], stk: ['stk', 1], 'stück': ['stk', 1], x: ['stk', 1],
+    tl: ['tl', 1], el: ['el', 1], bl: ['bl', 1], dash: ['dash', 1], dashes: ['dash', 1], spritzer: ['dash', 1],
+    scheibe: ['scheibe', 1], scheiben: ['scheibe', 1], zweig: ['zweig', 1], zweige: ['zweig', 1],
+};
+function parseAmount(raw) {
+    if (raw === undefined || raw === null) return null;
+    const s = String(raw).trim().toLowerCase().replace(/,/g, '.');
+    if (!s) return null;
+    const m = s.match(/^(\d+(?:\.\d+)?)(?:\s*\/\s*(\d+))?(?:\s*(?:-|–|bis)\s*(\d+(?:\.\d+)?))?\s*([a-zäöüß]*)\.?$/);
+    if (!m) return null;
+    let a = parseFloat(m[1]);
+    if (m[2]) a /= parseFloat(m[2]);
+    const b = m[3] ? parseFloat(m[3]) : a;
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+    const u = UNITS[m[4]];
+    return u ? { min: a * u[1], max: b * u[1], dim: u[0] } : { min: a, max: b, dim: m[4] };
+}
+const num = (v) => String(Math.round(v * 100) / 100).replace('.', ',');
+function formatQty(v, dim) {
+    if (dim === 'ml') return v >= 1000 ? `${num(v / 1000)} l` : `${num(v / 10)} cl`;
+    if (dim === 'g') return v >= 1000 ? `${num(v / 1000)} kg` : `${num(v)} g`;
+    if (dim === 'stk') return `${num(v)} Stk.`;
+    const LABEL = { tl: 'TL', el: 'EL', bl: 'BL', dash: 'Dash', scheibe: v === 1 ? 'Scheibe' : 'Scheiben', zweig: v === 1 ? 'Zweig' : 'Zweige' };
+    return `${num(v)} ${LABEL[dim] || dim}`;
+}
+const formatRange = (min, max, dim) => (Math.abs(max - min) < 1e-9 ? formatQty(min, dim) : `${formatQty(min, dim)} – ${formatQty(max, dim)}`);
+
+// ============================================================================
+// Inventory ("Mein Bestand") & coverage
+// ============================================================================
+let invCache = { key: '', map: new Map() };
+function invIndex() {
+    const list = me?.inventory || [];
+    const key = JSON.stringify(list);
+    if (invCache.key !== key) {
+        const map = new Map();
+        for (const e of list) if (e?.item) map.set(String(e.item).trim().toLowerCase(), { ...e, parsed: parseAmount(e.amount) });
+        invCache = { key, map };
+    }
+    return invCache.map;
+}
+const inventoryActive = () => !!prefs.useInventory && (me?.inventory || []).length > 0;
+
+/** Share of a drink's ingredients that are in stock. "low" = in stock but less than required (counts half). */
+function coverage(d, servings = 1) {
+    const ings = d?.ingredients || [];
+    if (!ings.length) return null;
+    const inv = invIndex();
+    let have = 0;
+    const detail = ings.map((i) => {
+        const e = inv.get(String(i?.item || '').trim().toLowerCase());
+        if (!e) return 'missing';
+        const need = parseAmount(i.amount);
+        if (need && e.parsed && need.dim === e.parsed.dim && e.parsed.max < need.max * servings) { have += 0.5; return 'low'; }
+        have += 1;
+        return 'ok';
+    });
+    return { pct: Math.round((have / ings.length) * 100), ok: detail.filter((x) => x === 'ok').length, total: ings.length, detail };
+}
+function coverageChip(d) {
+    if (!inventoryActive()) return '';
+    const c = coverage(d);
+    if (!c) return '';
+    const cls = c.pct === 100 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200'
+        : c.pct >= 50 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
+            : 'bg-gray-100 text-gray-600 dark:bg-plum-800 dark:text-gray-300';
+    return `<span class="chip ${cls}" title="${c.ok} von ${c.total} Zutaten vorhanden"><i class="fas fa-box-open"></i>${c.pct} %</span>`;
+}
+function invMark(state) {
+    if (!state) return '';
+    if (state === 'ok') return '<i class="fas fa-check mt-1 text-emerald-500" title="Vorhanden"></i>';
+    if (state === 'low') return '<i class="fas fa-triangle-exclamation mt-1 text-amber-500" title="Zu wenig vorhanden"></i>';
+    return '<i class="fas fa-xmark mt-1 text-gray-300 dark:text-plum-600" title="Nicht vorhanden"></i>';
+}
+
+let invSaveTimer = null;
+function persistInventory() {
+    invCache.key = '';
+    updateInventoryBadge();
+    filterAndRenderDrinks();
+    if (me.isGuest) { writeLocal('barGuestInv', me.inventory); return; }
+    clearTimeout(invSaveTimer);
+    invSaveTimer = setTimeout(async () => {
+        try { await api('/api/action', { method: 'POST', body: { action: 'setInventory', items: me.inventory } }); }
+        catch (e) { toast(e.message, 'error'); }
+    }, 500);
+}
+function updateInventoryBadge() {
+    const n = (me?.inventory || []).length;
+    $('inventoryCount').textContent = n;
+    $('inventoryCount').classList.toggle('hidden', !n);
+    $('inventoryBtn').classList.toggle('ring-2', inventoryActive());
+    $('inventoryBtn').classList.toggle('ring-emerald-500', inventoryActive());
+}
+function allIngredientNames() {
+    return [...new Set([...Object.values(allIngredients).map((i) => i?.name), ...Object.values(allDrinks).flatMap((d) => (d.ingredients || []).map((i) => i?.item))].filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'de'));
+}
+function openInventory() {
+    $('useInventoryToggle').checked = !!prefs.useInventory;
+    $('invIngList').innerHTML = allIngredientNames().map((n) => `<option value="${esc(n)}">`).join('');
+    $('inventoryNote').textContent = me?.isGuest ? 'Als Gast wird dein Bestand nur auf diesem Gerät gespeichert.' : 'Menge ist optional, z. B. „70 cl" oder „500 g". Ohne Menge gilt die Zutat als ausreichend vorhanden.';
+    renderInventoryList();
+    openModal($('inventoryModal'));
+}
+function renderInventoryList() {
+    const box = $('inventoryList');
+    const list = me.inventory || [];
+    if (!list.length) { box.innerHTML = '<p class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">Noch nichts im Bestand. Füge oben Zutaten hinzu.</p>'; return; }
+    box.innerHTML = '';
+    box.classList.add('space-y-2');
+    list.map((e, idx) => ({ e, idx })).sort((a, b) => a.e.item.localeCompare(b.e.item, 'de')).forEach(({ e, idx }) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2';
+        row.innerHTML = `<span class="min-w-0 flex-1 truncate text-sm font-medium"></span>
+            <input class="input w-28 py-1.5 text-sm" maxlength="30" placeholder="Menge" aria-label="Menge">
+            <button class="icon-btn h-9 w-9 text-rose-500" aria-label="Entfernen"><i class="fas fa-trash text-xs"></i></button>`;
+        row.querySelector('span').textContent = e.item;
+        const amt = row.querySelector('input');
+        amt.value = e.amount || '';
+        amt.addEventListener('change', () => { me.inventory[idx] = { ...e, amount: amt.value.trim().slice(0, 30) }; persistInventory(); });
+        row.querySelector('button').addEventListener('click', () => { me.inventory.splice(idx, 1); persistInventory(); renderInventoryList(); });
+        box.appendChild(row);
+    });
+}
+function addToInventory(item, amount = '') {
+    item = String(item || '').trim().slice(0, 100);
+    if (!item) return false;
+    const i = me.inventory.findIndex((x) => x.item.toLowerCase() === item.toLowerCase());
+    if (i >= 0) { if (amount) me.inventory[i].amount = amount; return true; }
+    if (me.inventory.length >= 300) { toast('Maximal 300 Einträge im Bestand.', 'error'); return false; }
+    me.inventory.push({ item, amount: String(amount || '').trim().slice(0, 30) });
+    return true;
+}
+$('inventoryBtn').addEventListener('click', openInventory);
+$('inventoryAddForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (addToInventory($('invItem').value, $('invAmount').value)) {
+        $('invItem').value = ''; $('invAmount').value = '';
+        persistInventory(); renderInventoryList();
+        $('invItem').focus();
+    }
+});
+$('useInventoryToggle').addEventListener('change', (e) => {
+    prefs.useInventory = e.target.checked; savePrefs();
+    updateInventoryBadge(); filterAndRenderDrinks();
+});
+$('inventoryClearBtn').addEventListener('click', async () => {
+    if (!me.inventory.length) return;
+    if (!(await showConfirm('Alle Einträge werden aus deinem Bestand entfernt.', { title: 'Bestand leeren?', confirmLabel: 'Leeren' }))) return;
+    me.inventory = []; persistInventory(); renderInventoryList();
+});
+$('inventoryFromFolderBtn').addEventListener('click', () => {
+    const names = new Set();
+    Object.values(allDrinks).filter((d) => d.categoryId === selectedCategoryId).forEach((d) => (d.ingredients || []).forEach((i) => i?.item && names.add(i.item)));
+    let added = 0;
+    for (const n of names) if (!me.inventory.some((x) => x.item.toLowerCase() === n.toLowerCase()) && addToInventory(n)) added++;
+    if (added) { persistInventory(); renderInventoryList(); }
+    toast(added ? `${added} Zutat(en) hinzugefügt.` : 'Alle Zutaten des Ordners sind schon im Bestand.', added ? 'success' : 'info');
+});
+
+// ============================================================================
+// Totals: summed ingredient quantities for a folder or a selection
+// ============================================================================
+let totalsItems = [];   // [{ id, servings }]
+function openTotals(ids, title) {
+    totalsItems = ids.filter((id) => allDrinks[id]).map((id) => ({ id, servings: 1 }));
+    if (!totalsItems.length) return toast('Keine Drinks ausgewählt.', 'info');
+    $('totalsTitle').textContent = title;
+    $('totalsSubtractInv').checked = false;
+    $('totalsSubtractInv').disabled = !(me?.inventory || []).length;
+    renderTotals();
+    openModal($('totalsModal'));
+}
+function computeTotals() {
+    const rows = new Map();   // key: lower name → { name, qty: {dim: {min,max}}, other: {label: count} }
+    for (const { id, servings } of totalsItems) {
+        const d = allDrinks[id];
+        if (!d) continue;
+        for (const i of d.ingredients || []) {
+            if (!i?.item) continue;
+            const key = i.item.trim().toLowerCase();
+            const row = rows.get(key) || { name: i.item.trim(), qty: {}, other: {} };
+            const p = parseAmount(i.amount);
+            if (p) {
+                const q = row.qty[p.dim] || { min: 0, max: 0 };
+                q.min += p.min * servings; q.max += p.max * servings;
+                row.qty[p.dim] = q;
+            } else {
+                const label = String(i.amount || 'ohne Angabe').trim();
+                row.other[label] = (row.other[label] || 0) + servings;
+            }
+            rows.set(key, row);
+        }
+    }
+    return [...rows.values()].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+}
+function totalsLines(row, subtract) {
+    const parts = Object.entries(row.qty).map(([dim, q]) => formatRange(q.min, q.max, dim));
+    Object.entries(row.other).forEach(([label, n]) => parts.push(`${n}× ${label}`));
+    let status = '';
+    if (subtract) {
+        const inv = invIndex().get(row.name.toLowerCase());
+        if (!inv) status = 'fehlt';
+        else if (inv.parsed && row.qty[inv.parsed.dim]) {
+            const need = row.qty[inv.parsed.dim].max - inv.parsed.max;
+            status = need > 0 ? `fehlt ${formatQty(need, inv.parsed.dim)}` : 'ausreichend';
+        } else status = inv.amount ? `vorhanden: ${inv.amount}` : 'vorhanden';
+    }
+    return { amount: parts.join(' + ') || '–', status };
+}
+function renderTotals() {
+    const subtract = $('totalsSubtractInv').checked;
+    const rows = computeTotals();
+    const drinkRows = totalsItems.map(({ id, servings }, i) => `
+        <div class="flex items-center gap-2">
+            <span class="min-w-0 flex-1 truncate text-sm">${esc(allDrinks[id]?.name || '')}</span>
+            <input type="number" min="0" max="999" value="${servings}" data-i="${i}" class="tot-serv input w-20 py-1 text-sm" aria-label="Portionen">
+        </div>`).join('');
+    const statusCls = (st) => (st.startsWith('fehlt') ? 'text-rose-600 dark:text-rose-400' : st ? 'text-emerald-600 dark:text-emerald-400' : '');
+    $('totalsBody').innerHTML = `
+        <details class="rounded-xl border border-gray-100 dark:border-plum-800" ${totalsItems.length <= 6 ? 'open' : ''}>
+            <summary class="cursor-pointer select-none px-4 py-3 text-sm font-semibold">${totalsItems.length} Drink(s) · Portionen anpassen</summary>
+            <div class="max-h-60 space-y-2 overflow-y-auto px-4 pb-4">${drinkRows}</div>
+        </details>
+        ${rows.length ? `<div class="overflow-x-auto"><table class="w-full text-sm">
+            <thead><tr class="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500 dark:border-plum-700">
+                <th class="py-2 pr-3 font-semibold">Zutat</th><th class="py-2 pr-3 text-right font-semibold">Gesamt</th>${subtract ? '<th class="py-2 text-right font-semibold">Bestand</th>' : ''}
+            </tr></thead>
+            <tbody>${rows.map((r) => { const l = totalsLines(r, subtract); return `<tr class="border-b border-gray-100 dark:border-plum-800">
+                <td class="py-2 pr-3">${esc(r.name)}</td><td class="py-2 pr-3 text-right font-semibold tabular-nums">${esc(l.amount)}</td>
+                ${subtract ? `<td class="py-2 text-right text-xs ${statusCls(l.status)}">${esc(l.status)}</td>` : ''}</tr>`; }).join('')}
+            </tbody></table></div>
+            <p class="hint">Mengen wie „Auffüllen" werden gezählt, aber nicht summiert. Bereiche (z. B. 8–10) werden als Spanne addiert.</p>`
+        : '<p class="py-6 text-center text-sm text-gray-500">Die ausgewählten Drinks haben keine Zutaten.</p>'}`;
+    $('totalsBody').querySelectorAll('.tot-serv').forEach((inp) => inp.addEventListener('change', () => {
+        const v = Math.max(0, Math.min(999, Math.round(Number(inp.value) || 0)));
+        totalsItems[Number(inp.dataset.i)].servings = v;
+        renderTotals();
+    }));
+}
+$('totalsSubtractInv').addEventListener('change', renderTotals);
+$('totalsCopyBtn').addEventListener('click', async () => {
+    const subtract = $('totalsSubtractInv').checked;
+    const lines = [$('totalsTitle').textContent, ''];
+    totalsItems.filter((t) => t.servings).forEach(({ id, servings }) => lines.push(`${servings}× ${allDrinks[id]?.name}`));
+    lines.push('');
+    computeTotals().forEach((r) => { const l = totalsLines(r, subtract); lines.push(`- ${r.name}: ${l.amount}${l.status ? ` (${l.status})` : ''}`); });
+    try { await navigator.clipboard.writeText(lines.join('\n')); toast('Kopiert.', 'success'); }
+    catch { toast('Kopieren wird von diesem Browser nicht unterstützt.', 'error'); }
+});
+$('totalsBtn').addEventListener('click', () => {
+    const { list, acrossAll } = getVisibleDrinks();
+    const title = acrossAll ? 'Mengen: Suchergebnis' : `Mengen: ${allCategories[selectedCategoryId]?.name || 'Ordner'}`;
+    openTotals(list.map(([id]) => id), title);
+});
+$('bulkTotalsBtn').addEventListener('click', () => openTotals([...selectedDrinks], `Mengen: ${selectedDrinks.size === 1 ? '1 ausgewählter Drink' : `${selectedDrinks.size} ausgewählte Drinks`}`));
+
+// ============================================================================
+// Linked drinks (same drink in several folders)
+// ============================================================================
+function linkedGroupClient(id) {
+    const d = allDrinks[id];
+    if (!d) return [];
+    const norm = (n) => String(n || '').trim().toLowerCase();
+    if (d.linkId) return Object.keys(allDrinks).filter((k) => allDrinks[k]?.linkId === d.linkId);
+    return Object.keys(allDrinks).filter((k) => !allDrinks[k]?.linkId && norm(allDrinks[k]?.name) === norm(d.name));
+}
+let pendingSaveScope = 'all';
+function renderLinkHint(id) {
+    const group = id ? linkedGroupClient(id) : [];
+    const linked = group.length > 1;
+    $('drinkLinkHint').classList.toggle('hidden', !linked);
+    $('drinkSaveThisBtn').classList.toggle('hidden', !linked);
+    $('drinkSaveBtn').innerHTML = linked ? `<i class="fas fa-check"></i> Überall speichern (${group.length})` : '<i class="fas fa-check"></i> Speichern';
+    if (linked) {
+        const folders = [...new Set(group.map((k) => allCategories[allDrinks[k].categoryId]?.name).filter(Boolean))];
+        $('drinkLinkHint').innerHTML = `<i class="fas fa-link mr-1"></i> Dieser Drink ist in ${group.length} Ordnern: <strong></strong>. „Überall speichern" ändert alle Kopien, „Nur in diesem Ordner" löst diese Kopie von den anderen.`;
+        $('drinkLinkHint').querySelector('strong').textContent = folders.join(', ');
+    }
+}
+$('drinkSaveThisBtn').addEventListener('click', () => {
+    pendingSaveScope = 'this';
+    $('drinkForm').requestSubmit();
 });

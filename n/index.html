@@ -188,6 +188,7 @@
                         </label>
                         <p id="loginError" class="hidden rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" role="alert"></p>
                         <button type="submit" class="btn btn-primary w-full py-3">Anmelden</button>
+                        <button type="button" id="guestBtn" class="btn btn-secondary hidden w-full"><i class="fas fa-user-clock"></i> Als Gast fortfahren</button>
                         <p id="registerLinkWrap" class="text-center text-xs text-gray-500 dark:text-gray-400">
                             Noch kein Konto? <button type="button" data-auth-view="register" class="font-semibold text-indigo-600 hover:underline dark:text-zest-300">Konto erstellen</button>
                         </p>
@@ -369,7 +370,9 @@
                         <!-- Row 2: filter, selection, sort, view -->
                         <div class="flex flex-wrap items-center gap-2 lg:flex-1">
                             <button id="openFilterBtn" class="btn btn-secondary btn-sm h-9"><i class="fas fa-filter"></i> Filter <span id="filterCount" class="hidden rounded-full bg-indigo-600 px-1.5 text-[10px] text-white"></span></button>
-                            <button id="selectModeBtn" class="btn btn-secondary btn-sm hidden h-9"><i class="far fa-square-check"></i> Auswählen</button>
+                            <button id="inventoryBtn" class="btn btn-secondary btn-sm h-9" title="Mein Bestand"><i class="fas fa-box-open"></i> Bestand <span id="inventoryCount" class="hidden rounded-full bg-emerald-600 px-1.5 text-[10px] text-white"></span></button>
+                            <button id="totalsBtn" class="btn btn-secondary btn-sm h-9" title="Benötigte Mengen"><i class="fas fa-calculator"></i> Mengen</button>
+                            <button id="selectModeBtn" class="btn btn-secondary btn-sm h-9"><i class="far fa-square-check"></i> Auswählen</button>
                             <label id="searchAllWrap" class="hidden h-9 items-center gap-2 rounded-lg bg-white px-3 text-xs font-medium shadow-sm dark:bg-plum-900">
                                 <input id="searchAllToggle" type="checkbox" class="check h-4 w-4"> Alle Ordner
                             </label>
@@ -408,11 +411,12 @@
         <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-2">
             <span id="bulkCount" class="mr-auto text-sm font-semibold">0</span>
             <button id="bulkAllBtn" class="btn btn-ghost btn-sm">Alle</button>
-            <button id="bulkMoveBtn" class="btn btn-secondary btn-sm"><i class="fas fa-folder-open"></i><span class="hidden sm:inline">Verschieben</span></button>
-            <button id="bulkCopyBtn" class="btn btn-secondary btn-sm"><i class="fas fa-copy"></i><span class="hidden sm:inline">Kopieren</span></button>
-            <button id="bulkTagBtn" class="btn btn-secondary btn-sm"><i class="fas fa-hashtag"></i><span class="hidden sm:inline">Tags</span></button>
-            <button id="bulkTypeBtn" class="btn btn-secondary btn-sm"><i class="fas fa-martini-glass"></i><span class="hidden sm:inline">Typ</span></button>
-            <button id="bulkDeleteBtn" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i><span class="hidden sm:inline">Löschen</span></button>
+            <button id="bulkTotalsBtn" class="btn btn-secondary btn-sm"><i class="fas fa-calculator"></i><span class="hidden sm:inline">Mengen</span></button>
+            <button id="bulkMoveBtn" class="btn btn-secondary btn-sm bulk-edit-only"><i class="fas fa-folder-open"></i><span class="hidden sm:inline">Verschieben</span></button>
+            <button id="bulkCopyBtn" class="btn btn-secondary btn-sm bulk-edit-only"><i class="fas fa-copy"></i><span class="hidden sm:inline">Kopieren</span></button>
+            <button id="bulkTagBtn" class="btn btn-secondary btn-sm bulk-edit-only"><i class="fas fa-hashtag"></i><span class="hidden sm:inline">Tags</span></button>
+            <button id="bulkTypeBtn" class="btn btn-secondary btn-sm bulk-edit-only"><i class="fas fa-martini-glass"></i><span class="hidden sm:inline">Typ</span></button>
+            <button id="bulkDeleteBtn" class="btn btn-danger btn-sm bulk-edit-only"><i class="fas fa-trash"></i><span class="hidden sm:inline">Löschen</span></button>
             <button id="bulkDoneBtn" class="btn btn-primary btn-sm">Fertig</button>
         </div>
     </div>
@@ -550,8 +554,10 @@
                     </div>
                 </div>
             </div>
+            <div id="drinkLinkHint" class="hidden flex-shrink-0 border-t border-indigo-100 bg-indigo-50 px-5 py-2.5 text-xs text-indigo-900 dark:border-plum-800 dark:bg-indigo-950/50 dark:text-indigo-100 sm:px-6"></div>
             <div class="panel-foot">
                 <button type="button" class="btn btn-secondary modal-close">Abbrechen</button>
+                <button type="button" id="drinkSaveThisBtn" class="btn btn-secondary hidden"><i class="fas fa-folder"></i> Nur in diesem Ordner</button>
                 <button type="submit" id="drinkSaveBtn" class="btn btn-primary"><i class="fas fa-check"></i> Speichern</button>
             </div>
         </form>
@@ -854,6 +860,49 @@
         </div>
     </div>
 
+    <!-- Inventory -->
+    <div id="inventoryModal" class="modal modal-backdrop fixed inset-0 z-50 hidden items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="inventoryTitle">
+        <div class="panel sm:max-w-lg">
+            <div class="panel-head">
+                <h3 id="inventoryTitle" class="panel-title">Mein Bestand</h3>
+                <button class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="space-y-3 border-b border-gray-100 px-5 py-4 dark:border-plum-800 sm:px-6">
+                <label class="flex items-center justify-between gap-3 rounded-lg bg-emerald-50 px-3 py-2.5 text-sm dark:bg-emerald-950/40">
+                    <span><span class="block font-semibold">Beim Sortieren berücksichtigen</span><span class="hint">Drinks mit den meisten vorhandenen Zutaten zuerst, mit Prozentanzeige.</span></span>
+                    <input id="useInventoryToggle" type="checkbox" class="check flex-shrink-0">
+                </label>
+                <form id="inventoryAddForm" class="flex gap-2">
+                    <input id="invItem" list="invIngList" placeholder="Zutat" class="input min-w-0 flex-1" autocomplete="off">
+                    <input id="invAmount" placeholder="Menge (optional)" maxlength="30" class="input w-32">
+                    <button type="submit" class="btn btn-success" aria-label="Hinzufügen"><i class="fas fa-plus"></i></button>
+                    <datalist id="invIngList"></datalist>
+                </form>
+                <p id="inventoryNote" class="hint"></p>
+            </div>
+            <div class="panel-body" id="inventoryList"></div>
+            <div class="panel-foot">
+                <button id="inventoryClearBtn" class="btn btn-ghost mr-auto text-rose-600">Leeren</button>
+                <button id="inventoryFromFolderBtn" class="btn btn-secondary"><i class="fas fa-folder-plus"></i> Zutaten des Ordners</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Totals -->
+    <div id="totalsModal" class="modal modal-backdrop fixed inset-0 z-50 hidden items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="totalsTitle">
+        <div class="panel sm:max-w-2xl">
+            <div class="panel-head">
+                <h3 id="totalsTitle" class="panel-title">Benötigte Mengen</h3>
+                <button class="icon-btn modal-close" aria-label="Schließen"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body" id="totalsBody"></div>
+            <div class="panel-foot">
+                <label class="mr-auto flex items-center gap-2 text-sm"><input id="totalsSubtractInv" type="checkbox" class="check"> Bestand abziehen</label>
+                <button id="totalsCopyBtn" class="btn btn-secondary"><i class="far fa-copy"></i> Als Text kopieren</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Tag manager / browser -->
     <div id="tagModal" class="modal modal-backdrop fixed inset-0 z-50 hidden items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="tagModalTitle">
         <div class="panel sm:max-w-lg">
@@ -950,6 +999,6 @@
             });
         }
     </script>
-    <script type="module" src="./app.js?v=3.1.2"></script>
+    <script type="module" src="./app.js?v=3.2.0"></script>
 </body>
 </html>

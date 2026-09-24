@@ -1,13 +1,13 @@
 // sw.js – Bar Organizer Deluxe
 // Increment the version whenever cached files change.
-const VERSION = 'v3.1.2';
+const VERSION = 'v3.2.0';
 const STATIC_CACHE = `bar-organizer-static-${VERSION}`;
 const RUNTIME_CACHE = `bar-organizer-runtime-${VERSION}`;
 const IMAGE_CACHE = 'bar-organizer-images';   // kept across versions, size-limited
 const MAX_IMAGES = 150;
 
 // Must succeed for the install to succeed
-const CORE_ASSETS = ['./', './index.html', './app.js?v=3.1.1'];
+const CORE_ASSETS = ['./', './index.html', './app.js?v=3.2.0'];
 
 // Best effort (install does not fail if one of these is missing)
 const OPTIONAL_ASSETS = [
